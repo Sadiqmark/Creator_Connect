@@ -1,0 +1,182 @@
+// Creator Connect — Prisma Schema
+// Single source of truth for the PostgreSQL database architecture
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CREATOR
+  BUSINESS
+}
+
+enum AccountStatus {
+  ACTIVE
+  DELETED
+}
+
+enum InquiryStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CLOSED
+}
+
+enum NotificationType {
+  INQUIRY_RECEIVED
+  INQUIRY_ACCEPTED
+  INQUIRY_REJECTED
+  INQUIRY_EXPIRED
+  COLLABORATION_EMAIL_UPDATED
+}
+
+enum AuditEventType {
+  INQUIRY_CREATED
+  INQUIRY_ACCEPTED
+  INQUIRY_REJECTED
+  INQUIRY_EXPIRED
+  INQUIRY_CLOSED
+  COLLABORATION_EMAIL_UPDATED
+  ACCOUNT_DELETED
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  firebaseUid  String        @unique @map("firebase_uid") @db.VarChar(128)
+  email        String        @unique @db.VarChar(255)
+  role         UserRole
+  status       AccountStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
+
+  creatorProfile    CreatorProfile?
+  businessProfile   BusinessProfile?
+  sentInquiries     Inquiry[]        @relation("BusinessInquiries")
+  receivedInquiries Inquiry[]        @relation("CreatorInquiries")
+  savedCreators     SavedCreator[]   @relation("BusinessSavedCreators")
+  savedByBusinesses SavedCreator[]   @relation("CreatorSavedByBusinesses")
+  notifications     Notification[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+model CreatorProfile {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  name               String    @db.VarChar(150)
+  profilePhotoUrl    String?   @map("profile_photo_url") @db.VarChar(500)
+  niche              String    @db.VarChar(100)
+  location           String    @db.VarChar(150)
+  bio                String    @db.Text
+  specialties        String[]  @default([])
+  instagramUrl       String?   @map("instagram_url") @db.VarChar(300)
+  youtubeUrl         String?   @map("youtube_url") @db.VarChar(300)
+  collaborationEmail String?   @map("collaboration_email") @db.VarChar(255)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([niche])
+  @@index([location])
+  @@map("creator_profiles")
+}
+
+model BusinessProfile {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  businessName       String    @map("business_name") @db.VarChar(200)
+  category           String    @db.VarChar(100)
+  description        String    @db.Text
+  city               String    @db.VarChar(100)
+  stateOrProvince    String    @map("state_or_province") @db.VarChar(100)
+  country            String    @db.VarChar(100)
+  collaborationEmail String?   @map("collaboration_email") @db.VarChar(255)
+  logoUrl            String?   @map("logo_url") @db.VarChar(500)
+  websiteUrl         String?   @map("website_url") @db.VarChar(300)
+  instagramUrl       String?   @map("instagram_url") @db.VarChar(300)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@map("business_profiles")
+}
+
+model Inquiry {
+  id                     String        @id @default(uuid()) @db.Uuid
+  businessId             String        @map("business_id") @db.Uuid
+  creatorId              String        @map("creator_id") @db.Uuid
+  status                 InquiryStatus @default(PENDING)
+  collaborationType      String        @map("collaboration_type") @db.VarChar(100)
+  platform               String        @db.VarChar(50)
+  deliverables           String        @db.Text
+  timelineStart          DateTime?     @map("timeline_start") @db.Date
+  timelineEnd            DateTime?     @map("timeline_end") @db.Date
+  brief                  String        @db.Text
+  additionalRequirements String?       @map("additional_requirements") @db.Text
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  respondedAt            DateTime?     @map("responded_at") @db.Timestamptz
+  expiresAt              DateTime      @map("expires_at") @db.Timestamptz
+  closedAt               DateTime?     @map("closed_at") @db.Timestamptz
+
+  business User @relation("BusinessInquiries", fields: [businessId], references: [id], onDelete: Restrict)
+  creator  User @relation("CreatorInquiries", fields: [creatorId], references: [id], onDelete: Restrict)
+
+  @@index([businessId, status, createdAt(sort: Desc)])
+  @@index([creatorId, status, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@map("inquiries")
+}
+
+model SavedCreator {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  creatorId  String   @map("creator_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  business User @relation("BusinessSavedCreators", fields: [businessId], references: [id], onDelete: Cascade)
+  creator  User @relation("CreatorSavedByBusinesses", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, creatorId])
+  @@index([businessId, createdAt(sort: Desc)])
+  @@map("saved_creators")
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  type        NotificationType
+  referenceId String?          @map("reference_id") @db.Uuid
+  readAt      DateTime?        @map("read_at") @db.Timestamptz
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id           String         @id @default(uuid()) @db.Uuid
+  eventType    AuditEventType @map("event_type")
+  actorUserId  String?        @map("actor_user_id") @db.Uuid
+  resourceType String         @map("resource_type") @db.VarChar(50)
+  resourceId   String         @map("resource_id") @db.Uuid
+  metadata     Json?
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([resourceType, resourceId, createdAt(sort: Desc)])
+  @@index([actorUserId])
+  @@map("audit_events")
+}
