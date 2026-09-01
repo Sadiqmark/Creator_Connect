@@ -18,7 +18,11 @@
     "test": "npm run test --workspace=backend && npm run test --workspace=frontend",
     "test:backend": "npm run test --workspace=backend",
     "test:frontend": "npm run test --workspace=frontend",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:generate": "npm run --workspace=backend db:generate",
+    "db:migrate": "npm run --workspace=backend db:migrate",
+    "db:seed": "npm run --workspace=backend db:seed",
+    "db:studio": "npm run --workspace=backend db:studio"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

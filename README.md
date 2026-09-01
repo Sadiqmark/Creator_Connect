@@ -12,6 +12,7 @@ Creator Connect is governed strictly by the following four architectural and spe
 2. [ARCHITECTURE.md](ARCHITECTURE.md) — How the system is built, invariants, and technical architecture.
 3. [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) — How the product looks, feels, moves, and behaves.
 4. [IMPLEMENTATION_CONTROL_PLAN.md](IMPLEMENTATION_CONTROL_PLAN.md) — Implementation governance and phase sequencing.
+5. [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) — Canonical development environment setup and portability guide.
 
 ---
 
@@ -78,10 +79,14 @@ Creator_Connect/
    npm install
    ```
 
-3. **Configure Environment Variables:**
+3. **Complete Environment & Database Setup:**
+   * Refer to **[DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md)** for detailed PostgreSQL, Firebase, and Prisma setup instructions.
    ```bash
    cp backend/.env.example backend/.env
    cp frontend/.env.example frontend/.env
+   npm run db:generate
+   npm run db:migrate
+   npm run db:seed
    ```
 
 ---
@@ -101,15 +106,21 @@ npm run dev
 
 ---
 
-## 🧪 Testing, Typechecking & Linting
+## 🧪 Testing, Typechecking & Database Scripts
 
 | Command | Description |
 |---|---|
 | `npm run test` | Run both Backend (Jest) and Frontend (Vitest) test suites |
 | `npm run test:backend` | Run backend tests with Jest and Supertest |
 | `npm run test:frontend` | Run frontend tests with Vitest and React Testing Library |
+| `npm run test:e2e` | Run Playwright real-browser E2E test suite in Chrome |
 | `npm run typecheck` | Run TypeScript strict mode verification across all workspaces |
+| `npm run lint` | Run ESLint verification across backend and frontend |
 | `npm run build` | Build shared types, backend TypeScript, and frontend Vite bundle |
+| `npm run db:generate` | Generate Prisma Client TypeScript definitions |
+| `npm run db:migrate` | Apply pending PostgreSQL migrations |
+| `npm run db:seed` | Seed deterministic development baseline dataset |
+| `npm run db:studio` | Open Prisma visual database browser |
 
 ---
 

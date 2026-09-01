@@ -11,7 +11,6 @@ const envSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().optional().default('placeholder-project-id'),
   FIREBASE_CLIENT_EMAIL: z.string().optional().default('placeholder@example.com'),
   FIREBASE_PRIVATE_KEY: z.string().optional().default('placeholder-key'),
-  USE_MOCK_SERVICES: z.string().default('true').transform((val) => val === 'true'),
 });
 
 const parseEnv = () => {
