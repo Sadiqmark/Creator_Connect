@@ -13,6 +13,11 @@ import { CreatorDashboard } from './pages/dashboards/CreatorDashboard';
 import { BusinessDashboard } from './pages/dashboards/BusinessDashboard';
 import { CreatorOnboardingPage } from './pages/onboarding/CreatorOnboardingPage';
 import { BusinessOnboardingPage } from './pages/onboarding/BusinessOnboardingPage';
+import { CreatorProfilePage } from './pages/creator/CreatorProfilePage';
+import { BusinessProfilePage } from './pages/business/BusinessProfilePage';
+import { PublicCreatorProfilePage } from './pages/public/PublicCreatorProfilePage';
+import { CreatorDiscoveryPage } from './pages/public/CreatorDiscoveryPage';
+import { BusinessProfileViewPage } from './pages/creator/BusinessProfileViewPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -29,7 +34,7 @@ const RootRedirect: React.FC = () => {
   }
 
   if (status === 'UNAUTHENTICATED') {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/creators" replace />;
   }
 
   if (status === 'UNVERIFIED') {
@@ -59,6 +64,11 @@ export const App: React.FC = () => {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
+        {/* Public Browsing Routes (Phase 4A locked decision #2: Guests can browse & view) */}
+        <Route path="/creators" element={<CreatorDiscoveryPage />} />
+        <Route path="/creators/:creatorId" element={<PublicCreatorProfilePage />} />
+        <Route path="/businesses/:businessId" element={<BusinessProfileViewPage />} />
+
         {/* Protected Role Provisioning */}
         <Route
           path="/select-role"
@@ -69,7 +79,7 @@ export const App: React.FC = () => {
           }
         />
 
-        {/* Protected Onboarding Routes */}
+        {/* Protected Creator Routes */}
         <Route
           path="/onboarding/creator"
           element={
@@ -79,16 +89,6 @@ export const App: React.FC = () => {
           }
         />
         <Route
-          path="/onboarding/business"
-          element={
-            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
-              <BusinessOnboardingPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Protected Dashboard Workspaces */}
-        <Route
           path="/creator/dashboard"
           element={
             <ProtectedRoute allowedRole={UserRole.CREATOR}>
@@ -97,10 +97,36 @@ export const App: React.FC = () => {
           }
         />
         <Route
+          path="/creator/profile"
+          element={
+            <ProtectedRoute allowedRole={UserRole.CREATOR}>
+              <CreatorProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected Business Routes */}
+        <Route
+          path="/onboarding/business"
+          element={
+            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
+              <BusinessOnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/business/dashboard"
           element={
             <ProtectedRoute allowedRole={UserRole.BUSINESS}>
               <BusinessDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/profile"
+          element={
+            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
+              <BusinessProfilePage />
             </ProtectedRoute>
           }
         />

@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { updateMyBusinessProfile } from '../../services/api/businesses';
+import {
+  getMyBusinessProfile,
+  updateMyBusinessProfile,
+  BusinessPrivateProfile,
+} from '../../services/api/businesses';
 import { PhotoUpload } from '../../components/ui/PhotoUpload';
 import {
   Building2,
@@ -9,8 +13,10 @@ import {
   Globe,
   Instagram,
   AlertCircle,
+  CheckCircle2,
   Loader2,
-  ArrowRight,
+  Eye,
+  ArrowLeft,
 } from 'lucide-react';
 
 const BUSINESS_CATEGORIES = [
@@ -34,12 +40,16 @@ const BUSINESS_CATEGORIES = [
   'Other',
 ];
 
-export const BusinessOnboardingPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { appUser, refreshMe } = useAuth();
+export const BusinessProfilePage: React.FC = () => {
+  const { appUser } = useAuth();
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [profile, setProfile] = useState<BusinessPrivateProfile | null>(null);
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -48,7 +58,7 @@ export const BusinessOnboardingPage: React.FC = () => {
     city: '',
     stateOrProvince: '',
     country: '',
-    collaborationEmail: appUser?.email || '',
+    collaborationEmail: '',
     logoUrl: '' as string | null,
     websiteUrl: '',
     instagramUrl: '',
@@ -56,13 +66,49 @@ export const BusinessOnboardingPage: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const data = await getMyBusinessProfile();
+        setProfile(data);
+        setFormData({
+          businessName: data.businessName || '',
+          category: data.category || '',
+          description: data.description || '',
+          city: data.city || '',
+          stateOrProvince: data.stateOrProvince || '',
+          country: data.country || '',
+          collaborationEmail: data.collaborationEmail || '',
+          logoUrl: data.logoUrl || null,
+          websiteUrl: data.websiteUrl || '',
+          instagramUrl: data.instagramUrl || '',
+        });
+      } catch (err: any) {
+        if (err.statusCode === 404) {
+          setFormData((prev) => ({
+            ...prev,
+            collaborationEmail: appUser?.email || '',
+          }));
+        } else {
+          setLoadError(err.message || 'Failed to load business profile.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [appUser]);
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
 
     if (!formData.businessName.trim()) errs.businessName = 'Business name is required.';
-    if (!formData.category.trim()) errs.category = 'Select an industry category.';
+    if (!formData.category.trim()) errs.category = 'Industry category is required.';
     if (!formData.description.trim()) {
-      errs.description = 'Provide a brief description of your brand and what you look for in creators.';
+      errs.description = 'Description is required.';
     } else if (formData.description.length < 20) {
       errs.description = 'Description should be at least 20 characters.';
     }
@@ -85,22 +131,23 @@ export const BusinessOnboardingPage: React.FC = () => {
       formData.instagramUrl.trim() &&
       !formData.instagramUrl.includes('instagram.com')
     ) {
-      errs.instagramUrl = 'Must be a valid Instagram URL (e.g. https://instagram.com/brand).';
+      errs.instagramUrl = 'Must be a valid Instagram URL.';
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
-    setIsSubmitting(true);
-    setSubmitError(null);
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setSaveError(null);
 
     try {
-      await updateMyBusinessProfile({
+      const updated = await updateMyBusinessProfile({
         businessName: formData.businessName.trim(),
         category: formData.category.trim(),
         description: formData.description.trim(),
@@ -113,45 +160,81 @@ export const BusinessOnboardingPage: React.FC = () => {
         instagramUrl: formData.instagramUrl.trim() || null,
       });
 
-      await refreshMe();
-      navigate('/business/dashboard', { replace: true });
+      setProfile(updated);
+      setSaveSuccess(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setSubmitError(err.message || 'Failed to complete business profile. Please verify your inputs.');
+      setSaveError(err.message || 'Failed to update business profile.');
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-accent/10 text-accent mb-3">
-            <Building2 className="w-3.5 h-3.5" /> Brand Onboarding
-          </span>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
-            Set Up Your Business Profile
-          </h1>
-          <p className="mt-2 text-sm text-foreground-muted">
-            Introduce your brand to top creators and prepare to launch collaboration campaigns.
+    <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Top bar */}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/business/dashboard"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-muted hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </Link>
+
+          {profile?.id && (
+            <Link
+              to={`/businesses/${profile.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
+            >
+              <Eye className="w-4 h-4" /> View Public Brand Card
+            </Link>
+          )}
+        </div>
+
+        {/* Page Title */}
+        <div>
+          <h1 className="font-display text-3xl font-bold text-foreground">Edit Business Profile</h1>
+          <p className="text-sm text-foreground-muted mt-1">
+            Maintain your brand identity, contact preferences, and public overview.
           </p>
         </div>
 
-        {/* Error Alert */}
-        {submitError && (
-          <div className="mb-6 p-4 bg-danger/10 border border-danger/30 rounded-xl flex items-start gap-3 text-sm text-danger animate-fadeIn">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">Unable to save profile</p>
-              <p>{submitError}</p>
-            </div>
+        {/* Alerts */}
+        {saveSuccess && (
+          <div className="p-4 bg-success/10 border border-success/30 rounded-xl flex items-center gap-2 text-sm text-success animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>Business profile successfully saved and updated!</span>
           </div>
         )}
 
-        {/* Form Body */}
+        {saveError && (
+          <div className="p-4 bg-danger/10 border border-danger/30 rounded-xl flex items-center gap-2 text-sm text-danger animate-fadeIn">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
+        {loadError && (
+          <div className="p-4 bg-danger/10 border border-danger/30 rounded-xl flex items-center gap-2 text-sm text-danger">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{loadError}</span>
+          </div>
+        )}
+
+        {/* Form */}
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleSave}
           className="bg-surface p-6 sm:p-8 rounded-2xl border border-border shadow-card space-y-6"
         >
           {/* Logo Upload */}
@@ -163,39 +246,39 @@ export const BusinessOnboardingPage: React.FC = () => {
             nameFallback={formData.businessName || 'Brand'}
           />
 
-          {/* Business Name */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Brand / Business Name <span className="text-danger">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.businessName}
-              onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-              placeholder="e.g. Lumina Apparel"
-              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent"
-            />
-            {errors.businessName && <p className="mt-1 text-xs text-danger">{errors.businessName}</p>}
-          </div>
+          {/* Business Name & Category */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Business Name <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.businessName}
+                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-accent"
+              />
+              {errors.businessName && <p className="mt-1 text-xs text-danger">{errors.businessName}</p>}
+            </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Industry Category <span className="text-danger">*</span>
-            </label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-accent"
-            >
-              <option value="">Select an industry...</option>
-              {BUSINESS_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-            {errors.category && <p className="mt-1 text-xs text-danger">{errors.category}</p>}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Industry Category <span className="text-danger">*</span>
+              </label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-accent"
+              >
+                <option value="">Select an industry...</option>
+                {BUSINESS_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              {errors.category && <p className="mt-1 text-xs text-danger">{errors.category}</p>}
+            </div>
           </div>
 
           {/* Description */}
@@ -213,8 +296,7 @@ export const BusinessOnboardingPage: React.FC = () => {
               maxLength={2000}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe your products, brand aesthetic, and the types of creator collaborations you run..."
-              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent resize-y"
+              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-accent resize-y"
             />
             {errors.description && <p className="mt-1 text-xs text-danger">{errors.description}</p>}
           </div>
@@ -229,7 +311,6 @@ export const BusinessOnboardingPage: React.FC = () => {
                 type="text"
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                placeholder="San Francisco"
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
               />
               {errors.city && <p className="mt-1 text-xs text-danger">{errors.city}</p>}
@@ -243,7 +324,6 @@ export const BusinessOnboardingPage: React.FC = () => {
                 type="text"
                 value={formData.stateOrProvince}
                 onChange={(e) => setFormData({ ...formData, stateOrProvince: e.target.value })}
-                placeholder="CA"
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
               />
               {errors.stateOrProvince && (
@@ -259,7 +339,6 @@ export const BusinessOnboardingPage: React.FC = () => {
                 type="text"
                 value={formData.country}
                 onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="United States"
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
               />
               {errors.country && <p className="mt-1 text-xs text-danger">{errors.country}</p>}
@@ -280,34 +359,28 @@ export const BusinessOnboardingPage: React.FC = () => {
               type="email"
               value={formData.collaborationEmail}
               onChange={(e) => setFormData({ ...formData, collaborationEmail: e.target.value })}
-              placeholder="influencer-team@lumina.com"
-              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent"
+              className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-accent"
             />
-            <p className="mt-1.5 text-xs text-foreground-muted flex items-start gap-1">
-              <span>🔒</span>
-              <span>
-                Kept strictly confidential. Only revealed to a creator after they accept your
-                collaboration inquiry.
-              </span>
+            <p className="mt-1 text-xs text-foreground-muted">
+              🔒 Private. Only shared with a creator after they accept your collaboration inquiry.
             </p>
             {errors.collaborationEmail && (
               <p className="mt-1 text-xs text-danger">{errors.collaborationEmail}</p>
             )}
           </div>
 
-          {/* Web & Social Links */}
+          {/* Links */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border pt-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
                 <span className="flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-foreground-muted" /> Website URL (Optional)
+                  <Globe className="w-4 h-4 text-foreground-muted" /> Website URL
                 </span>
               </label>
               <input
                 type="url"
                 value={formData.websiteUrl}
                 onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-                placeholder="https://lumina.com"
                 className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
               />
               {errors.websiteUrl && <p className="mt-1 text-xs text-danger">{errors.websiteUrl}</p>}
@@ -316,14 +389,13 @@ export const BusinessOnboardingPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
                 <span className="flex items-center gap-1.5">
-                  <Instagram className="w-4 h-4 text-pink-600" /> Instagram URL (Optional)
+                  <Instagram className="w-4 h-4 text-pink-600" /> Instagram Profile URL
                 </span>
               </label>
               <input
                 type="url"
                 value={formData.instagramUrl}
                 onChange={(e) => setFormData({ ...formData, instagramUrl: e.target.value })}
-                placeholder="https://instagram.com/lumina"
                 className="w-full px-3.5 py-2.5 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
               />
               {errors.instagramUrl && (
@@ -332,20 +404,20 @@ export const BusinessOnboardingPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-4 border-t border-border">
+          {/* Save Button */}
+          <div className="pt-4 border-t border-border flex justify-end">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 px-4 rounded-xl shadow-subtle text-sm font-bold text-white bg-accent hover:bg-accent/90 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              disabled={isSaving}
+              className="px-6 py-2.5 rounded-xl shadow-subtle text-sm font-bold text-white bg-accent hover:bg-accent/90 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
-              {isSubmitting ? (
+              {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Saving Business Profile...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Saving Changes...
                 </>
               ) : (
                 <>
-                  Enter Brand Workspace <ArrowRight className="w-4 h-4" />
+                  Save Changes <Building2 className="w-4 h-4" />
                 </>
               )}
             </button>
