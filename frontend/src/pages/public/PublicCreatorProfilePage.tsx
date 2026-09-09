@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +10,7 @@ import {
   unsaveCreator,
 } from '../../services/api/savedCreators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { InquiryFormModal } from '../../components/inquiry/InquiryFormModal';
 import {
   MapPin,
   Instagram,
@@ -30,6 +31,7 @@ export const PublicCreatorProfilePage: React.FC = () => {
   const { appUser } = useAuth();
   const isBusiness = appUser?.role === UserRole.BUSINESS;
   const isCreator = appUser?.role === UserRole.CREATOR;
+  const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false);
 
   // TanStack Query for public profile details
   const {
@@ -104,7 +106,9 @@ export const PublicCreatorProfilePage: React.FC = () => {
       navigate('/login', { state: { from: `/creators/${creatorId}` } });
       return;
     }
-    alert('Collaboration inquiries are not available in Phase 6B.');
+    if (isBusiness) {
+      setIsInquiryModalOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -202,14 +206,16 @@ export const PublicCreatorProfilePage: React.FC = () => {
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={handleInquiryClick}
-                className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-accent/90 flex items-center justify-center gap-2 shadow-subtle transition-colors"
-              >
-                <Send className="w-4 h-4" />
-                Send Inquiry
-              </button>
+              {!isCreator && (
+                <button
+                  type="button"
+                  onClick={handleInquiryClick}
+                  className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-accent/90 flex items-center justify-center gap-2 shadow-subtle transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                  Send Inquiry
+                </button>
+              )}
             </div>
           </div>
 
@@ -283,6 +289,15 @@ export const PublicCreatorProfilePage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Structured Inquiry Modal */}
+        {creator && (
+          <InquiryFormModal
+            creator={creator}
+            isOpen={isInquiryModalOpen}
+            onClose={() => setIsInquiryModalOpen(false)}
+          />
+        )}
       </div>
     </div>
   );
