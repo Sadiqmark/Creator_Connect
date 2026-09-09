@@ -1,8 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '@creator-connect/shared';
-import { getPublicCreatorProfile, CreatorPublicProfile } from '../../services/api/creators';
+import { getPublicCreatorProfile } from '../../services/api/creators';
+import {
+  getSavedCreatorIds,
+  saveCreator,
+  unsaveCreator,
+} from '../../services/api/savedCreators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import {
   MapPin,
@@ -20,56 +26,85 @@ import {
 export const PublicCreatorProfilePage: React.FC = () => {
   const { creatorId } = useParams<{ creatorId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { appUser } = useAuth();
+  const isBusiness = appUser?.role === UserRole.BUSINESS;
+  const isCreator = appUser?.role === UserRole.CREATOR;
 
-  const [creator, setCreator] = useState<CreatorPublicProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  // TanStack Query for public profile details
+  const {
+    data: creator,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['creator', creatorId],
+    queryFn: () => getPublicCreatorProfile(creatorId!),
+    enabled: Boolean(creatorId),
+  });
 
-  useEffect(() => {
-    const loadProfile = async () => {
+  // TanStack Query for saved creator IDs (business only)
+  const { data: savedCreatorIds = [] } = useQuery({
+    queryKey: ['saved-creator-ids'],
+    queryFn: getSavedCreatorIds,
+    enabled: isBusiness,
+  });
+
+  const isSaved = Boolean(creatorId && savedCreatorIds.includes(creatorId));
+
+  // Save / Unsave Mutation with Optimistic Rollback
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       if (!creatorId) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await getPublicCreatorProfile(creatorId);
-        setCreator(data);
-      } catch (err: any) {
-        if (err.statusCode === 404) {
-          setError('Creator profile not found or is currently private.');
-        } else {
-          setError(err.message || 'Failed to load creator profile.');
-        }
-      } finally {
-        setIsLoading(false);
+      if (isSaved) {
+        return unsaveCreator(creatorId);
+      } else {
+        return saveCreator(creatorId);
       }
-    };
+    },
+    onMutate: async () => {
+      if (!creatorId) return;
+      await queryClient.cancelQueries({ queryKey: ['saved-creator-ids'] });
+      const previousIds = queryClient.getQueryData<string[]>(['saved-creator-ids']) || [];
 
-    loadProfile();
-  }, [creatorId]);
+      // Optimistic toggle
+      queryClient.setQueryData<string[]>(['saved-creator-ids'], (old = []) => {
+        if (isSaved) {
+          return old.filter((id) => id !== creatorId);
+        } else {
+          return [...old, creatorId];
+        }
+      });
 
-  const handleAuthenticatedAction = (actionType: 'save' | 'inquiry') => {
-    // If not authenticated, redirect to login with return path
+      return { previousIds };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousIds) {
+        queryClient.setQueryData(['saved-creator-ids'], context.previousIds);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-creator-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['saved-creators'] });
+    },
+  });
+
+  const handleSaveClick = () => {
     if (!appUser) {
       navigate('/login', { state: { from: `/creators/${creatorId}` } });
       return;
     }
+    if (isBusiness) {
+      saveMutation.mutate();
+    }
+  };
 
-    // If logged in as Creator
-    if (appUser.role === UserRole.CREATOR) {
-      alert('Only business accounts can save creators or send collaboration inquiries.');
+  const handleInquiryClick = () => {
+    if (!appUser) {
+      navigate('/login', { state: { from: `/creators/${creatorId}` } });
       return;
     }
-
-    // Business user action
-    if (actionType === 'save') {
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
-    } else {
-      // In Phase 5 full inquiries are implemented. For Phase 4B:
-      alert(`Inquiry feature: Start a collaboration with ${creator?.name}.`);
-    }
+    alert('Collaboration inquiries are not available in Phase 6B.');
   };
 
   if (isLoading) {
@@ -80,7 +115,7 @@ export const PublicCreatorProfilePage: React.FC = () => {
     );
   }
 
-  if (error || !creator) {
+  if (isError || !creator) {
     return (
       <div className="min-h-screen bg-background py-16 px-4 flex flex-col items-center justify-center text-center">
         <AlertCircle className="w-12 h-12 text-foreground-muted mb-4" />
@@ -88,7 +123,8 @@ export const PublicCreatorProfilePage: React.FC = () => {
           Profile Not Available
         </h1>
         <p className="text-sm text-foreground-muted max-w-md mb-6">
-          {error || 'The requested creator profile could not be found.'}
+          {(error as any)?.message ||
+            'The requested creator profile could not be found or is not currently discoverable.'}
         </p>
         <Link
           to="/creators"
@@ -122,7 +158,7 @@ export const PublicCreatorProfilePage: React.FC = () => {
         </div>
 
         {/* Profile Card Header */}
-        <div className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-card">
+        <article className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-card">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div className="flex items-center gap-5">
               <AvatarWithFallback
@@ -147,24 +183,28 @@ export const PublicCreatorProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Action buttons (Save & Inquire) */}
+            {/* Action buttons (Save & Send Inquiry placeholder) */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => handleAuthenticatedAction('save')}
-                className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-subtle ${
-                  savedSuccess
-                    ? 'bg-success/10 border-success/30 text-success'
-                    : 'bg-surface border-border hover:bg-surface-muted text-foreground'
-                }`}
-              >
-                <Bookmark className="w-4 h-4" />
-                {savedSuccess ? 'Saved' : 'Save Creator'}
-              </button>
+              {!isCreator && (
+                <button
+                  type="button"
+                  onClick={handleSaveClick}
+                  disabled={saveMutation.isPending}
+                  aria-label={isSaved ? 'Unsave creator' : 'Save creator'}
+                  className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-subtle ${
+                    isSaved
+                      ? 'bg-accent/10 border-accent/30 text-accent'
+                      : 'bg-surface border-border hover:bg-surface-muted text-foreground'
+                  }`}
+                >
+                  <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-accent text-accent' : ''}`} />
+                  {isSaved ? 'Saved' : 'Save Creator'}
+                </button>
+              )}
 
               <button
                 type="button"
-                onClick={() => handleAuthenticatedAction('inquiry')}
+                onClick={handleInquiryClick}
                 className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-accent/90 flex items-center justify-center gap-2 shadow-subtle transition-colors"
               >
                 <Send className="w-4 h-4" />
@@ -205,11 +245,11 @@ export const PublicCreatorProfilePage: React.FC = () => {
               )}
             </div>
           )}
-        </div>
+        </article>
 
         {/* Bio & Content Specialties */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Main Story / Bio */}
+          {/* Main Bio */}
           <div className="md:col-span-2 bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-card space-y-4">
             <h2 className="text-lg font-bold text-foreground">About the Creator</h2>
             <p className="text-sm text-foreground-muted leading-relaxed whitespace-pre-line">
@@ -238,8 +278,7 @@ export const PublicCreatorProfilePage: React.FC = () => {
             {/* Privacy Note */}
             <div className="pt-4 border-t border-border">
               <p className="text-xs text-foreground-muted">
-                🛡️ Direct collaboration email and contact channels become available immediately
-                upon accepted collaboration inquiry.
+                🛡️ Direct contact details become available to authorized business partners after an accepted collaboration inquiry.
               </p>
             </div>
           </div>

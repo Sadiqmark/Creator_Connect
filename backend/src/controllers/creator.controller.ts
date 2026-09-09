@@ -121,11 +121,6 @@ export const getPublicCreatorProfile = async (req: Request, res: Response): Prom
       res.status(404).json({ error: { code: 'CREATOR_NOT_FOUND', message: 'Creator profile not found.', requestId: req.id } });
       return;
     }
-    // Non-discoverable profiles are not publicly surfaced via direct URL
-    if (!profile.isDiscoverable) {
-      res.status(404).json({ error: { code: 'CREATOR_NOT_FOUND', message: 'Creator profile not found.', requestId: req.id } });
-      return;
-    }
     res.status(200).json({ profile });
   } catch (err: any) {
     logger.error({ err }, 'Failed to get public creator profile');
@@ -135,15 +130,27 @@ export const getPublicCreatorProfile = async (req: Request, res: Response): Prom
 
 /**
  * GET /api/v1/creators
- * List discoverable creators — no auth required for browsing.
+ * List discoverable creators with search, filters, and pagination.
  */
 export const listCreators = async (req: Request, res: Response): Promise<void> => {
+  const q = typeof req.query.q === 'string' ? req.query.q : undefined;
   const search = typeof req.query.search === 'string' ? req.query.search : undefined;
   const niche = typeof req.query.niche === 'string' ? req.query.niche : undefined;
+  const city = typeof req.query.city === 'string' ? req.query.city : undefined;
+  const country = typeof req.query.country === 'string' ? req.query.country : undefined;
+  const page = req.query.page !== undefined ? Number(req.query.page) : undefined;
+  const limit = req.query.limit !== undefined ? Number(req.query.limit) : undefined;
 
   try {
-    const creators = await creatorService.listDiscoverableCreators({ search, niche });
-    res.status(200).json({ creators });
+    const result = await creatorService.listDiscoverableCreators({
+      q: q || search,
+      niche,
+      city,
+      country,
+      page,
+      limit,
+    });
+    res.status(200).json(result);
   } catch (err: any) {
     logger.error({ err }, 'Failed to list creators');
     res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load creators.', requestId: req.id } });

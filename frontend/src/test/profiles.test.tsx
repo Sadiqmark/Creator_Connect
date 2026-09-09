@@ -46,7 +46,6 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
     it('renders creator profile for unauthenticated guest and STRICTLY OMITS collaborationEmail', async () => {
       const mockProfile: creatorsApi.CreatorPublicProfile = {
         id: 'creator-123',
-        userId: 'user-123',
         name: 'Elena Rostova',
         profilePhotoUrl: 'https://images.example.com/elena.jpg',
         niche: 'Fashion & Style',
@@ -55,9 +54,6 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
         specialties: ['Short-Form Video', 'Editorial Photos'],
         instagramUrl: 'https://instagram.com/elena',
         youtubeUrl: 'https://youtube.com/@elena',
-        isDiscoverable: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
 
       vi.mocked(creatorsApi.getPublicCreatorProfile).mockResolvedValue(mockProfile);
@@ -115,7 +111,6 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
       const mockCreators: creatorsApi.CreatorPublicProfile[] = [
         {
           id: 'c-1',
-          userId: 'u-1',
           name: 'Alex Rivera',
           profilePhotoUrl: null,
           niche: 'Fitness & Health',
@@ -124,13 +119,20 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
           specialties: ['UGC', 'Product Reviews'],
           instagramUrl: 'https://instagram.com/alex',
           youtubeUrl: null,
-          isDiscoverable: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         },
       ];
 
-      vi.mocked(creatorsApi.listCreators).mockResolvedValue(mockCreators);
+      vi.mocked(creatorsApi.listCreators).mockResolvedValue({
+        creators: mockCreators,
+        pagination: {
+          page: 1,
+          limit: 24,
+          total: 1,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
 
       render(
         <QueryClientProvider client={queryClient}>

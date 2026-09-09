@@ -81,6 +81,14 @@ export const BusinessDashboard: React.FC = () => {
             </Link>
 
             <Link
+              to="/business/saved-creators"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Saved Creators
+            </Link>
+
+            <Link
               to="/business/profile"
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >

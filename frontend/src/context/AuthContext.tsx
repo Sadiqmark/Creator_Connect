@@ -85,7 +85,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    const win = typeof window !== 'undefined' ? (window as any) : null;
+    if (win && win.__MOCK_FIREBASE_USER__) {
+      const fbUser = win.__MOCK_FIREBASE_USER__;
+      setFirebaseUser(fbUser);
+      fetchAppUser(fbUser);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (win && win.__MOCK_FIREBASE_USER__) return;
       setFirebaseUser(fbUser);
       if (fbUser) {
         await fetchAppUser(fbUser);

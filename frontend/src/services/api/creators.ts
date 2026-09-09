@@ -2,7 +2,6 @@ import { apiClient } from './client';
 
 export interface CreatorPublicProfile {
   id: string;
-  userId: string;
   name: string;
   profilePhotoUrl: string | null;
   niche: string;
@@ -11,13 +10,38 @@ export interface CreatorPublicProfile {
   specialties: string[];
   instagramUrl: string | null;
   youtubeUrl: string | null;
+}
+
+export interface CreatorPrivateProfile extends CreatorPublicProfile {
+  userId: string;
+  collaborationEmail: string | null;
   isDiscoverable: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreatorPrivateProfile extends CreatorPublicProfile {
-  collaborationEmail: string | null;
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export interface ListCreatorsParams {
+  q?: string;
+  search?: string;
+  niche?: string;
+  city?: string;
+  country?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListCreatorsResponse {
+  creators: CreatorPublicProfile[];
+  pagination: PaginationMeta;
 }
 
 export interface CreatorProfileFormData {
@@ -66,12 +90,9 @@ export const getPublicCreatorProfile = async (creatorId: string): Promise<Creato
   return res.data.profile;
 };
 
-export const listCreators = async (params?: {
-  search?: string;
-  niche?: string;
-}): Promise<CreatorPublicProfile[]> => {
-  const res = await apiClient.get<{ creators: CreatorPublicProfile[] }>('/creators', { params });
-  return res.data.creators;
+export const listCreators = async (params?: ListCreatorsParams): Promise<ListCreatorsResponse> => {
+  const res = await apiClient.get<ListCreatorsResponse>('/creators', { params });
+  return res.data;
 };
 
 export const getCreatorDashboard = async (): Promise<CreatorDashboardSummary> => {

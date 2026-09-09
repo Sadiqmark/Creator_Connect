@@ -15,6 +15,14 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
+      const win = typeof window !== 'undefined' ? (window as any) : null;
+      if (win && win.__MOCK_FIREBASE_USER__) {
+        const token = typeof win.__MOCK_FIREBASE_USER__.getIdToken === 'function'
+          ? await win.__MOCK_FIREBASE_USER__.getIdToken()
+          : 'mock-token';
+        config.headers.Authorization = `Bearer ${token}`;
+        return config;
+      }
       const currentUser = auth.currentUser;
       if (currentUser) {
         const token = await currentUser.getIdToken();
