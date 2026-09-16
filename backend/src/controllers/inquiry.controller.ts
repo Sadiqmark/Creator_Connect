@@ -1,5 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { createInquiry, acceptInquiry, rejectInquiry } from '../services/inquiry.service';
+import {
+  createInquiry,
+  acceptInquiry,
+  rejectInquiry,
+  listBusinessInquiries,
+  getBusinessInquiryById,
+} from '../services/inquiry.service';
 import { AppError } from '../middleware/errorHandler';
 
 export async function createInquiryHandler(
@@ -15,6 +21,54 @@ export async function createInquiryHandler(
 
     const inquiry = await createInquiry(businessUserId, req.body);
     res.status(201).json({ inquiry });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listBusinessInquiriesHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const businessUserId = req.user?.id;
+    if (!businessUserId) {
+      throw new AppError('Authentication required.', 401, 'UNAUTHORIZED');
+    }
+
+    const { status, page, limit } = req.query;
+
+    const result = await listBusinessInquiries(businessUserId, {
+      status: status ? (status as any) : undefined,
+      page: page ? parseInt(page as string, 10) : undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getBusinessInquiryHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const businessUserId = req.user?.id;
+    if (!businessUserId) {
+      throw new AppError('Authentication required.', 401, 'UNAUTHORIZED');
+    }
+
+    const { inquiryId } = req.params;
+    if (!inquiryId) {
+      throw new AppError('Inquiry ID is required.', 400, 'VALIDATION_ERROR');
+    }
+
+    const inquiry = await getBusinessInquiryById(businessUserId, inquiryId);
+    res.status(200).json({ inquiry });
   } catch (error) {
     next(error);
   }
@@ -65,3 +119,4 @@ export async function rejectInquiryHandler(
     next(error);
   }
 }
+

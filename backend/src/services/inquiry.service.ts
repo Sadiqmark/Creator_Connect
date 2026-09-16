@@ -1,8 +1,8 @@
-import { InquiryStatus, NotificationType, AuditEventType, UserRole } from '@prisma/client';
+import { InquiryStatus, NotificationType, AuditEventType, UserRole, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../database/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { computeDiscoverability } from './creator.service';
+import { computeDiscoverability, PUBLIC_CREATOR_SELECT } from './creator.service';
 
 export const createInquiryInputSchema = z
   .object({
@@ -502,3 +502,218 @@ export async function expireInquiries(batchSize = 100): Promise<{ expiredCount: 
 
   return { expiredCount };
 }
+
+// ─── Business Inquiry Management DTOs & Services (Phase 9) ───────────────────
+
+export type BusinessInquiryListItemDTO = {
+  id: string;
+  status: InquiryStatus;
+  collaborationType: string;
+  platform: string;
+  deliverables: string;
+  timelineStart: string | null;
+  timelineEnd: string | null;
+  createdAt: string;
+  expiresAt: string;
+  respondedAt: string | null;
+  creator: {
+    id: string; // canonical CreatorProfile.id
+    name: string;
+    profilePhotoUrl: string | null;
+    niche: string;
+    location: string;
+  };
+};
+
+export type BusinessInquiryDetailDTO = {
+  id: string;
+  status: InquiryStatus;
+  collaborationType: string;
+  platform: string;
+  deliverables: string;
+  timelineStart: string | null;
+  timelineEnd: string | null;
+  brief: string;
+  additionalRequirements: string | null;
+  createdAt: string;
+  expiresAt: string;
+  respondedAt: string | null;
+  closedAt: string | null;
+  creator: {
+    id: string; // canonical CreatorProfile.id
+    name: string;
+    profilePhotoUrl: string | null;
+    niche: string;
+    location: string;
+    bio: string;
+    specialties: string[];
+    instagramUrl: string | null;
+    youtubeUrl: string | null;
+  };
+};
+
+export type ListBusinessInquiriesResult = {
+  inquiries: BusinessInquiryListItemDTO[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+/**
+ * List inquiries sent by the authenticated business with optional status filter and pagination.
+ * Strictly scopes by businessId to prevent cross-business access.
+ */
+export async function listBusinessInquiries(
+  businessUserId: string,
+  options: {
+    status?: InquiryStatus;
+    page?: number;
+    limit?: number;
+  }
+): Promise<ListBusinessInquiriesResult> {
+  const page = Math.max(1, options.page || 1);
+  const limit = Math.min(50, Math.max(1, options.limit || 10));
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.InquiryWhereInput = {
+    businessId: businessUserId,
+  };
+
+  if (options.status) {
+    if (!Object.values(InquiryStatus).includes(options.status)) {
+      throw new AppError('Invalid status filter.', 400, 'INVALID_STATUS_FILTER');
+    }
+    where.status = options.status;
+  }
+
+  const [total, inquiries] = await Promise.all([
+    prisma.inquiry.count({ where }),
+    prisma.inquiry.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+      include: {
+        creator: {
+          select: {
+            creatorProfile: {
+              select: {
+                id: true,
+                name: true,
+                profilePhotoUrl: true,
+                niche: true,
+                location: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    inquiries: inquiries.map((inq) => {
+      const cp = inq.creator.creatorProfile;
+      return {
+        id: inq.id,
+        status: inq.status,
+        collaborationType: inq.collaborationType,
+        platform: inq.platform,
+        deliverables: inq.deliverables,
+        timelineStart: inq.timelineStart
+          ? inq.timelineStart.toISOString().split('T')[0]
+          : null,
+        timelineEnd: inq.timelineEnd
+          ? inq.timelineEnd.toISOString().split('T')[0]
+          : null,
+        createdAt: inq.createdAt.toISOString(),
+        expiresAt: inq.expiresAt.toISOString(),
+        respondedAt: inq.respondedAt ? inq.respondedAt.toISOString() : null,
+        creator: {
+          id: cp?.id ?? inq.creatorId,
+          name: cp?.name ?? 'Creator',
+          profilePhotoUrl: cp?.profilePhotoUrl ?? null,
+          niche: cp?.niche ?? '',
+          location: cp?.location ?? '',
+        },
+      };
+    }),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  };
+}
+
+/**
+ * Retrieves full details of an inquiry for the authenticated business.
+ * Privacy-preserving: returns 404 INQUIRY_NOT_FOUND if inquiry does not exist
+ * or if it belongs to a different business.
+ * Excludes private collaboration email and internal IDs.
+ */
+export async function getBusinessInquiryById(
+  businessUserId: string,
+  inquiryId: string
+): Promise<BusinessInquiryDetailDTO> {
+  if (!inquiryId || !UUID_REGEX.test(inquiryId)) {
+    throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
+  }
+
+  const inquiry = await prisma.inquiry.findUnique({
+    where: { id: inquiryId },
+    include: {
+      creator: {
+        select: {
+          creatorProfile: {
+            select: PUBLIC_CREATOR_SELECT,
+          },
+        },
+      },
+    },
+  });
+
+  if (!inquiry || inquiry.businessId !== businessUserId) {
+    throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
+  }
+
+  const cp = inquiry.creator.creatorProfile;
+
+  return {
+    id: inquiry.id,
+    status: inquiry.status,
+    collaborationType: inquiry.collaborationType,
+    platform: inquiry.platform,
+    deliverables: inquiry.deliverables,
+    timelineStart: inquiry.timelineStart
+      ? inquiry.timelineStart.toISOString().split('T')[0]
+      : null,
+    timelineEnd: inquiry.timelineEnd
+      ? inquiry.timelineEnd.toISOString().split('T')[0]
+      : null,
+    brief: inquiry.brief,
+    additionalRequirements: inquiry.additionalRequirements,
+    createdAt: inquiry.createdAt.toISOString(),
+    expiresAt: inquiry.expiresAt.toISOString(),
+    respondedAt: inquiry.respondedAt ? inquiry.respondedAt.toISOString() : null,
+    closedAt: inquiry.closedAt ? inquiry.closedAt.toISOString() : null,
+    creator: {
+      id: cp?.id ?? inquiry.creatorId,
+      name: cp?.name ?? 'Creator',
+      profilePhotoUrl: cp?.profilePhotoUrl ?? null,
+      niche: cp?.niche ?? '',
+      location: cp?.location ?? '',
+      bio: cp?.bio ?? '',
+      specialties: cp?.specialties ?? [],
+      instagramUrl: cp?.instagramUrl ?? null,
+      youtubeUrl: cp?.youtubeUrl ?? null,
+    },
+  };
+}
+

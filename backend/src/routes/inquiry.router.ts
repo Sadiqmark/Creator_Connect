@@ -3,12 +3,38 @@ import {
   createInquiryHandler,
   acceptInquiryHandler,
   rejectInquiryHandler,
+  listBusinessInquiriesHandler,
+  getBusinessInquiryHandler,
 } from '../controllers/inquiry.controller';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/requireRole';
 import { UserRole } from '@prisma/client';
 
 const router = Router();
+
+/**
+ * GET /api/v1/inquiries
+ * Lists all inquiries sent by the authenticated Business with pagination and status filtering.
+ * Strictly restricted to BUSINESS role.
+ */
+router.get(
+  '/',
+  authMiddleware,
+  requireRole(UserRole.BUSINESS),
+  listBusinessInquiriesHandler
+);
+
+/**
+ * GET /api/v1/inquiries/:inquiryId
+ * Retrieves full details of a specific inquiry owned by the authenticated Business.
+ * Strictly restricted to BUSINESS role.
+ */
+router.get(
+  '/:inquiryId',
+  authMiddleware,
+  requireRole(UserRole.BUSINESS),
+  getBusinessInquiryHandler
+);
 
 /**
  * POST /api/v1/inquiries

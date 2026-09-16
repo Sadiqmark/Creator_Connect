@@ -19,6 +19,8 @@ import { PublicCreatorProfilePage } from './pages/public/PublicCreatorProfilePag
 import { CreatorDiscoveryPage } from './pages/public/CreatorDiscoveryPage';
 import { BusinessProfileViewPage } from './pages/creator/BusinessProfileViewPage';
 import { SavedCreatorsPage } from './pages/business/SavedCreatorsPage';
+import { BusinessInquiriesPage } from './pages/business/BusinessInquiriesPage';
+import { BusinessInquiryDetailPage } from './pages/business/BusinessInquiryDetailPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -142,6 +144,22 @@ export const App: React.FC = () => {
         <Route
           path="/business/saved"
           element={<Navigate to="/business/saved-creators" replace />}
+        />
+        <Route
+          path="/business/inquiries"
+          element={
+            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
+              <BusinessInquiriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/business/inquiries/:inquiryId"
+          element={
+            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
+              <BusinessInquiryDetailPage />
+            </ProtectedRoute>
+          }
         />
 
         {/* Error & Gating Pages */}
