@@ -2,6 +2,7 @@ import { InquiryStatus, NotificationType, AuditEventType, UserRole } from '@pris
 import { z } from 'zod';
 import prisma from '../database/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { computeDiscoverability } from './creator.service';
 
 export const createInquiryInputSchema = z
   .object({
@@ -123,6 +124,8 @@ export async function createInquiry(
       specialties: true,
       instagramUrl: true,
       youtubeUrl: true,
+      profilePhotoUrl: true,
+      collaborationEmail: true,
       user: {
         select: { id: true, role: true, status: true },
       },
@@ -137,16 +140,9 @@ export async function createInquiry(
     throw new AppError('Creator profile not found or unavailable.', 404, 'CREATOR_NOT_FOUND');
   }
 
-  // Binary discoverability check
-  if (
-    !creatorProfile.name?.trim() ||
-    !creatorProfile.niche?.trim() ||
-    !creatorProfile.location?.trim() ||
-    !creatorProfile.bio?.trim() ||
-    !Array.isArray(creatorProfile.specialties) ||
-    creatorProfile.specialties.length === 0 ||
-    (!creatorProfile.instagramUrl && !creatorProfile.youtubeUrl)
-  ) {
+  // Canonical discoverability check
+  const { isDiscoverable } = computeDiscoverability(creatorProfile);
+  if (!isDiscoverable) {
     throw new AppError('Creator profile is not complete or discoverable.', 404, 'CREATOR_NOT_FOUND');
   }
 

@@ -161,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updated = auth.currentUser;
       setFirebaseUser({ ...updated } as FirebaseUser);
       if (updated.emailVerified) {
+        await updated.getIdToken(true);
         await fetchAppUser(updated);
         return true;
       }

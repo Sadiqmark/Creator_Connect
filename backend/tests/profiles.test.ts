@@ -161,6 +161,143 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
       expect(res.body.profile.name).toBe('Sarah Connor');
       expect(res.body.profile.collaborationEmail).toBe('collab@example.com');
     });
+
+    it('should compute isDiscoverable=false when profilePhotoUrl is null', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      const upsertedRecord = {
+        id: 'cp-001',
+        userId: mockCreatorUser.id,
+        name: 'Sarah Connor',
+        niche: 'Fitness',
+        location: 'Los Angeles, CA',
+        bio: 'Fitness and lifestyle creator.',
+        specialties: ['Fitness', 'Nutrition'],
+        instagramUrl: 'https://instagram.com/sarahconnor',
+        youtubeUrl: null,
+        collaborationEmail: 'collab@example.com',
+        profilePhotoUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      jest.spyOn(prisma.creatorProfile, 'upsert').mockResolvedValue(upsertedRecord as any);
+
+      const res = await request(app)
+        .patch('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          name: 'Sarah Connor',
+          niche: 'Fitness',
+          location: 'Los Angeles, CA',
+          bio: 'Fitness and lifestyle creator.',
+          specialties: ['Fitness', 'Nutrition'],
+          instagramUrl: 'https://instagram.com/sarahconnor',
+          collaborationEmail: 'collab@example.com',
+          profilePhotoUrl: null,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.profile.isDiscoverable).toBe(false);
+      expect(res.body.profile.profilePhotoUrl).toBeNull();
+    });
+
+    it('should compute isDiscoverable=false when collaborationEmail is null', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      const upsertedRecord = {
+        id: 'cp-001',
+        userId: mockCreatorUser.id,
+        name: 'Sarah Connor',
+        niche: 'Fitness',
+        location: 'Los Angeles, CA',
+        bio: 'Fitness and lifestyle creator.',
+        specialties: ['Fitness', 'Nutrition'],
+        instagramUrl: 'https://instagram.com/sarahconnor',
+        youtubeUrl: null,
+        collaborationEmail: null,
+        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      jest.spyOn(prisma.creatorProfile, 'upsert').mockResolvedValue(upsertedRecord as any);
+
+      const res = await request(app)
+        .patch('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          name: 'Sarah Connor',
+          niche: 'Fitness',
+          location: 'Los Angeles, CA',
+          bio: 'Fitness and lifestyle creator.',
+          specialties: ['Fitness', 'Nutrition'],
+          instagramUrl: 'https://instagram.com/sarahconnor',
+          collaborationEmail: null,
+          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.profile.isDiscoverable).toBe(false);
+      expect(res.body.profile.collaborationEmail).toBeNull();
+    });
+
+    it('should allow partial PATCH of existing profile while preserving discoverability', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      const existingRecord = {
+        id: 'cp-001',
+        userId: mockCreatorUser.id,
+        name: 'Sarah Connor',
+        niche: 'Fitness',
+        location: 'Los Angeles, CA',
+        bio: 'Old bio.',
+        specialties: ['Fitness', 'Nutrition'],
+        instagramUrl: 'https://instagram.com/sarahconnor',
+        youtubeUrl: null,
+        collaborationEmail: 'collab@example.com',
+        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const updatedRecord = {
+        ...existingRecord,
+        bio: 'Updated bio for fitness partnerships.',
+      };
+
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue(existingRecord as any);
+      jest.spyOn(prisma.creatorProfile, 'upsert').mockResolvedValue(updatedRecord as any);
+
+      const res = await request(app)
+        .patch('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          bio: 'Updated bio for fitness partnerships.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.profile.bio).toBe('Updated bio for fitness partnerships.');
+      expect(res.body.profile.isDiscoverable).toBe(true);
+    });
   });
 
   describe('3. Privacy Boundary: Collaboration Email Leak Prevention', () => {
@@ -208,7 +345,8 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         specialties: ['Fitness'],
         instagramUrl: 'https://instagram.com/sarah',
         youtubeUrl: null,
-        profilePhotoUrl: null,
+        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        collaborationEmail: 'private-collab@example.com',
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
@@ -292,7 +430,8 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           specialties: ['Fitness'],
           instagramUrl: 'https://instagram.com/sarah',
           youtubeUrl: null,
-          profilePhotoUrl: null,
+          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+          collaborationEmail: 'private-collab@example.com',
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -330,7 +469,8 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         specialties: ['Fitness'],
         instagramUrl: 'https://instagram.com/sarah',
         youtubeUrl: null,
-        profilePhotoUrl: null,
+        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        collaborationEmail: 'private-collab@example.com',
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);

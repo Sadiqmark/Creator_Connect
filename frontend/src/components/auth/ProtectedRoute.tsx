@@ -35,9 +35,24 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     return <Navigate to="/login" state={{ sessionExpired: true, from: location }} replace />;
   }
 
-  // Handle unprovisioned or incomplete onboarding users
+  // Handle unprovisioned users needing role selection
   if (!appUser) {
+    if (location.pathname === '/select-role') {
+      return <>{children}</>;
+    }
     return <Navigate to="/select-role" replace />;
+  }
+
+  // If provisioned user visits /select-role, route to onboarding or dashboard
+  if (location.pathname === '/select-role') {
+    if (!onboardingCompleted) {
+      const onboardingRoute =
+        appUser.role === UserRole.CREATOR ? '/onboarding/creator' : '/onboarding/business';
+      return <Navigate to={onboardingRoute} replace />;
+    }
+    const dashboardRoute =
+      appUser.role === UserRole.CREATOR ? '/creator/dashboard' : '/business/dashboard';
+    return <Navigate to={dashboardRoute} replace />;
   }
 
   if (!onboardingCompleted && !location.pathname.startsWith('/onboarding')) {

@@ -30,3 +30,44 @@ describe('GET /api/v1/health', () => {
     expect(response.body.error).toHaveProperty('requestId');
   });
 });
+
+describe('CORS Origin & Preflight Verification', () => {
+  const app = createApp();
+
+  it('should allow preflight OPTIONS from http://localhost:5174 with PATCH method and credentials', async () => {
+    const response = await request(app)
+      .options('/api/v1/creators/me')
+      .set('Origin', 'http://localhost:5174')
+      .set('Access-Control-Request-Method', 'PATCH')
+      .set('Access-Control-Request-Headers', 'Content-Type, Authorization, X-Request-Id');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5174');
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+    expect(response.headers['access-control-allow-methods']).toContain('PATCH');
+    expect(response.headers['access-control-allow-headers']).toContain('Content-Type');
+    expect(response.headers['access-control-allow-headers']).toContain('Authorization');
+    expect(response.headers['access-control-allow-headers']).toContain('X-Request-Id');
+  });
+
+  it('should allow preflight OPTIONS from http://localhost:5173 with credentials', async () => {
+    const response = await request(app)
+      .options('/api/v1/creators/me')
+      .set('Origin', 'http://localhost:5173')
+      .set('Access-Control-Request-Method', 'PATCH');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+  });
+
+  it('should disallow unknown origins and not reflect Access-Control-Allow-Origin', async () => {
+    const response = await request(app)
+      .options('/api/v1/creators/me')
+      .set('Origin', 'http://unauthorized-domain.com')
+      .set('Access-Control-Request-Method', 'PATCH');
+
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+

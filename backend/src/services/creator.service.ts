@@ -95,13 +95,15 @@ export type CreatorDashboardSummaryDTO = {
 // ─── Discoverability logic (no DB column, computed from fields) ──────────────
 
 export function computeDiscoverability(profile: {
-  name: string;
-  niche: string;
-  location: string;
-  bio: string;
-  specialties: string[];
-  instagramUrl: string | null;
-  youtubeUrl: string | null;
+  name?: string | null;
+  niche?: string | null;
+  location?: string | null;
+  bio?: string | null;
+  specialties?: string[] | null;
+  instagramUrl?: string | null;
+  youtubeUrl?: string | null;
+  profilePhotoUrl?: string | null;
+  collaborationEmail?: string | null;
 }): { isDiscoverable: boolean; missingFields: string[] } {
   const missing: string[] = [];
 
@@ -109,8 +111,10 @@ export function computeDiscoverability(profile: {
   if (!profile.niche?.trim()) missing.push('niche');
   if (!profile.location?.trim()) missing.push('location');
   if (!profile.bio?.trim()) missing.push('bio');
-  if (!profile.specialties || profile.specialties.length === 0) missing.push('specialties');
+  if (!Array.isArray(profile.specialties) || profile.specialties.length === 0) missing.push('specialties');
   if (!profile.instagramUrl && !profile.youtubeUrl) missing.push('socialProfile');
+  if (!profile.profilePhotoUrl?.trim()) missing.push('profilePhoto');
+  if (!profile.collaborationEmail?.trim()) missing.push('collaborationEmail');
 
   return { isDiscoverable: missing.length === 0, missingFields: missing };
 }
@@ -156,19 +160,23 @@ export async function getMyCreatorProfile(userId: string): Promise<CreatorPrivat
 export async function upsertCreatorProfile(
   userId: string,
   data: {
-    name: string;
-    niche: string;
-    location: string;
-    bio: string;
-    specialties: string[];
+    name?: string;
+    niche?: string;
+    location?: string;
+    bio?: string;
+    specialties?: string[];
     instagramUrl?: string | null;
     youtubeUrl?: string | null;
     collaborationEmail?: string | null;
     profilePhotoUrl?: string | null;
   }
 ): Promise<CreatorPrivateDTO> {
-  // Service-level enforcement of at-least-one-social rule
-  if (!data.instagramUrl && !data.youtubeUrl) {
+  const existing = await prisma.creatorProfile.findUnique({ where: { userId } });
+
+  const effectiveIg = data.instagramUrl !== undefined ? data.instagramUrl : existing?.instagramUrl;
+  const effectiveYt = data.youtubeUrl !== undefined ? data.youtubeUrl : existing?.youtubeUrl;
+
+  if (!effectiveIg && !effectiveYt) {
     throw new AppError(
       'At least one social profile (Instagram or YouTube) is required.',
       422,
@@ -180,25 +188,25 @@ export async function upsertCreatorProfile(
     where: { userId },
     create: {
       userId,
-      name: data.name,
-      niche: data.niche,
-      location: data.location,
-      bio: data.bio,
-      specialties: data.specialties,
+      name: data.name || '',
+      niche: data.niche || '',
+      location: data.location || '',
+      bio: data.bio || '',
+      specialties: data.specialties || [],
       instagramUrl: data.instagramUrl ?? null,
       youtubeUrl: data.youtubeUrl ?? null,
       collaborationEmail: data.collaborationEmail ?? null,
       profilePhotoUrl: data.profilePhotoUrl ?? null,
     },
     update: {
-      name: data.name,
-      niche: data.niche,
-      location: data.location,
-      bio: data.bio,
-      specialties: data.specialties,
-      instagramUrl: data.instagramUrl ?? null,
-      youtubeUrl: data.youtubeUrl ?? null,
-      collaborationEmail: data.collaborationEmail ?? null,
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.niche !== undefined ? { niche: data.niche } : {}),
+      ...(data.location !== undefined ? { location: data.location } : {}),
+      ...(data.bio !== undefined ? { bio: data.bio } : {}),
+      ...(data.specialties !== undefined ? { specialties: data.specialties } : {}),
+      ...(data.instagramUrl !== undefined ? { instagramUrl: data.instagramUrl } : {}),
+      ...(data.youtubeUrl !== undefined ? { youtubeUrl: data.youtubeUrl } : {}),
+      ...(data.collaborationEmail !== undefined ? { collaborationEmail: data.collaborationEmail } : {}),
       ...(data.profilePhotoUrl !== undefined ? { profilePhotoUrl: data.profilePhotoUrl } : {}),
     },
   });
@@ -257,6 +265,7 @@ export async function getPublicCreatorProfile(creatorUserId: string): Promise<Cr
     where: { userId: creatorUserId },
     select: {
       ...PUBLIC_CREATOR_SELECT,
+      collaborationEmail: true,
       user: {
         select: { status: true },
       },
@@ -266,15 +275,8 @@ export async function getPublicCreatorProfile(creatorUserId: string): Promise<Cr
   if (!profile) return null;
   if (profile.user && profile.user.status !== 'ACTIVE') return null;
 
-  if (
-    !profile.name?.trim() ||
-    !profile.niche?.trim() ||
-    !profile.location?.trim() ||
-    !profile.bio?.trim() ||
-    !Array.isArray(profile.specialties) ||
-    profile.specialties.length === 0 ||
-    (!profile.instagramUrl && !profile.youtubeUrl)
-  ) {
+  const { isDiscoverable } = computeDiscoverability(profile);
+  if (!isDiscoverable) {
     return null;
   }
 
@@ -291,6 +293,7 @@ export async function getPublicCreatorProfileById(creatorProfileId: string): Pro
     where: { id: creatorProfileId },
     select: {
       ...PUBLIC_CREATOR_SELECT,
+      collaborationEmail: true,
       user: {
         select: { status: true },
       },
@@ -301,15 +304,8 @@ export async function getPublicCreatorProfileById(creatorProfileId: string): Pro
   if (profile.user && profile.user.status !== 'ACTIVE') return null;
 
   // Binary discoverability: all required fields must be non-empty
-  if (
-    !profile.name?.trim() ||
-    !profile.niche?.trim() ||
-    !profile.location?.trim() ||
-    !profile.bio?.trim() ||
-    !Array.isArray(profile.specialties) ||
-    profile.specialties.length === 0 ||
-    (!profile.instagramUrl && !profile.youtubeUrl)
-  ) {
+  const { isDiscoverable } = computeDiscoverability(profile);
+  if (!isDiscoverable) {
     return null;
   }
 
@@ -338,6 +334,10 @@ export async function listDiscoverableCreators(options?: ListCreatorsOptions): P
       ],
     },
     { specialties: { isEmpty: false } },
+    { profilePhotoUrl: { not: null } },
+    { profilePhotoUrl: { not: '' } },
+    { collaborationEmail: { not: null } },
+    { collaborationEmail: { not: '' } },
   ];
 
   if (options?.niche && options.niche !== 'All') {
@@ -376,7 +376,10 @@ export async function listDiscoverableCreators(options?: ListCreatorsOptions): P
       prisma.creatorProfile.count({ where }),
       prisma.creatorProfile.findMany({
         where,
-        select: PUBLIC_CREATOR_SELECT,
+        select: {
+          ...PUBLIC_CREATOR_SELECT,
+          collaborationEmail: true,
+        },
         orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
@@ -389,7 +392,10 @@ export async function listDiscoverableCreators(options?: ListCreatorsOptions): P
     if (err?.name === 'PrismaClientInitializationError') {
       profiles = await prisma.creatorProfile.findMany({
         where,
-        select: PUBLIC_CREATOR_SELECT,
+        select: {
+          ...PUBLIC_CREATOR_SELECT,
+          collaborationEmail: true,
+        },
         orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
@@ -401,7 +407,7 @@ export async function listDiscoverableCreators(options?: ListCreatorsOptions): P
   }
 
   const creators = profiles
-    .filter((p) => p.specialties && p.specialties.length > 0)
+    .filter((p) => computeDiscoverability(p).isDiscoverable)
     .map(toPublicCreatorDTO);
   const totalPages = Math.ceil(total / limit) || 1;
 
@@ -433,6 +439,8 @@ export async function getCreatorDashboardSummary(userId: string): Promise<Creato
         specialties: true,
         instagramUrl: true,
         youtubeUrl: true,
+        profilePhotoUrl: true,
+        collaborationEmail: true,
       },
     }),
     prisma.inquiry.groupBy({
@@ -462,7 +470,19 @@ export async function getCreatorDashboardSummary(userId: string): Promise<Creato
 
   const { isDiscoverable, missingFields } = profile
     ? computeDiscoverability(profile)
-    : { isDiscoverable: false, missingFields: ['name', 'niche', 'location', 'bio', 'specialties', 'socialProfile'] };
+    : {
+        isDiscoverable: false,
+        missingFields: [
+          'name',
+          'niche',
+          'location',
+          'bio',
+          'specialties',
+          'socialProfile',
+          'profilePhoto',
+          'collaborationEmail',
+        ],
+      };
 
   const countMap: Record<string, number> = {};
   for (const row of inquiryCounts) {

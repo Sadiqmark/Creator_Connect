@@ -160,4 +160,35 @@ describe('AuthContext Complete Lifecycle Tests', () => {
       'user@example.com'
     );
   });
+
+  it('6. reloadUser force-refreshes Firebase ID token when email is verified', async () => {
+    const { auth } = await import('../config/firebase');
+    if (auth.currentUser) {
+      (auth.currentUser as any).emailVerified = true;
+    }
+    vi.mocked(authApi.getMe).mockResolvedValue({
+      user: {
+        id: 'c-uuid-1',
+        firebaseUid: 'test-uid-123',
+        email: 'test@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.ACTIVE,
+        createdAt: new Date().toISOString(),
+      },
+      profile: null,
+      onboardingCompleted: false,
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    let verified = false;
+    await act(async () => {
+      verified = await result.current.reloadUser();
+    });
+
+    expect(auth.currentUser?.reload).toHaveBeenCalled();
+    expect(auth.currentUser?.getIdToken).toHaveBeenCalledWith(true);
+    expect(verified).toBe(true);
+  });
 });
+

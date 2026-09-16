@@ -232,6 +232,36 @@ describe('Phase 7B Inquiry Creation Test Suite', () => {
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');
     });
+
+    it('should return 404 when creator profile is missing profilePhotoUrl', async () => {
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue({
+        ...sampleCreatorProfile,
+        profilePhotoUrl: null,
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer valid-token')
+        .send(validPayload);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');
+    });
+
+    it('should return 404 when creator profile is missing collaborationEmail', async () => {
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue({
+        ...sampleCreatorProfile,
+        collaborationEmail: null,
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer valid-token')
+        .send(validPayload);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');
+    });
   });
 
   describe('4. Duplicate Active Inquiry Rule (PENDING & ACCEPTED)', () => {

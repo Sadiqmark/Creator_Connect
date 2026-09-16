@@ -97,6 +97,9 @@ export const CreatorProfilePage: React.FC = () => {
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
 
+    if (!formData.profilePhotoUrl || !formData.profilePhotoUrl.trim()) {
+      errs.profilePhotoUrl = 'Profile photo is required.';
+    }
     if (!formData.name.trim()) errs.name = 'Creator name is required.';
     if (!formData.niche.trim()) errs.niche = 'Primary niche is required.';
     if (!formData.location.trim()) errs.location = 'Location is required.';
@@ -259,9 +262,20 @@ export const CreatorProfilePage: React.FC = () => {
           {/* Photo */}
           <PhotoUpload
             value={formData.profilePhotoUrl}
-            onChange={(url) => setFormData((prev) => ({ ...prev, profilePhotoUrl: url }))}
+            onChange={(url) => {
+              setFormData((prev) => ({ ...prev, profilePhotoUrl: url }));
+              if (url) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.profilePhotoUrl;
+                  return next;
+                });
+              }
+            }}
             storagePath={`creators/${appUser?.id || 'temp'}/avatar`}
             label="Profile Photo"
+            required
+            error={errors.profilePhotoUrl}
             nameFallback={formData.name || 'Creator'}
           />
 

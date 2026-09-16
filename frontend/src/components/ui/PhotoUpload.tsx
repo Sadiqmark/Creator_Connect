@@ -1,24 +1,25 @@
 import React, { useRef, useState } from 'react';
 import { X, Loader2, Camera } from 'lucide-react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../config/firebase';
 import { AvatarWithFallback } from './AvatarWithFallback';
 
 interface PhotoUploadProps {
   value?: string | null;
   onChange: (url: string | null) => void;
-  storagePath: string; // e.g. `creators/${userId}/avatar` or `businesses/${userId}/logo`
+  storagePath?: string; // Kept for backward compatibility with callers; preset determines asset folder
   label?: string;
   nameFallback?: string;
   aspectRatio?: 'square' | 'wide';
+  required?: boolean;
+  error?: string;
 }
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   value,
   onChange,
-  storagePath,
   label = 'Profile Photo',
   nameFallback = 'Creator',
+  required = false,
+  error,
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -45,16 +46,32 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileRef = ref(storage, `${storagePath}_${Date.now()}.${fileExt}`);
-      await uploadBytes(fileRef, file);
-      const downloadUrl = await getDownloadURL(fileRef);
-      onChange(downloadUrl);
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'xinpxb9h';
+      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'creator_connect_profile_images';
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error?.message || 'Failed to upload image. Please try again.');
+      }
+
+      const secureUrl = data.secure_url;
+      if (!secureUrl) {
+        throw new Error('Upload succeeded but no secure URL was returned.');
+      }
+
+      onChange(secureUrl);
     } catch (err: any) {
-      // If Firebase storage fails (e.g. mock credentials in dev), generate an object URL for local preview
-      console.warn('Storage upload failed or unavailable, falling back to local object URL:', err);
-      const localUrl = URL.createObjectURL(file);
-      onChange(localUrl);
+      setUploadError(err?.message || 'Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -70,7 +87,9 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-foreground">{label}</label>
+      <label className="block text-sm font-medium text-foreground">
+        {label} {required && <span className="text-danger">*</span>}
+      </label>
 
       <div className="flex items-center gap-5">
         <div className="relative group">
@@ -125,7 +144,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         </div>
       </div>
 
-      {uploadError && <p className="text-xs text-danger font-medium">{uploadError}</p>}
+      {(uploadError || error) && <p className="text-xs text-danger font-medium">{uploadError || error}</p>}
     </div>
   );
 };

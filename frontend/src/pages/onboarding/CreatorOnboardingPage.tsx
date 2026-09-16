@@ -64,6 +64,9 @@ export const CreatorOnboardingPage: React.FC = () => {
     const errs: Record<string, string> = {};
 
     if (step === 1) {
+      if (!formData.profilePhotoUrl || !formData.profilePhotoUrl.trim()) {
+        errs.profilePhotoUrl = 'Profile photo is required.';
+      }
       if (!formData.name.trim()) errs.name = 'Full name or creator handle is required.';
       if (!formData.niche.trim()) errs.niche = 'Primary niche is required.';
       if (!formData.location.trim()) errs.location = 'Location (e.g. Los Angeles, CA) is required.';
@@ -121,7 +124,11 @@ export const CreatorOnboardingPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return;
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
+      if (!validateStep(1)) setCurrentStep(1);
+      else if (!validateStep(2)) setCurrentStep(2);
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -199,9 +206,20 @@ export const CreatorOnboardingPage: React.FC = () => {
               {/* Photo Upload */}
               <PhotoUpload
                 value={formData.profilePhotoUrl}
-                onChange={(url) => setFormData((prev) => ({ ...prev, profilePhotoUrl: url }))}
+                onChange={(url) => {
+                  setFormData((prev) => ({ ...prev, profilePhotoUrl: url }));
+                  if (url) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.profilePhotoUrl;
+                      return next;
+                    });
+                  }
+                }}
                 storagePath={`creators/${appUser?.id || 'temp'}/avatar`}
                 label="Profile Photo"
+                required
+                error={errors.profilePhotoUrl}
                 nameFallback={formData.name || 'Creator'}
               />
 

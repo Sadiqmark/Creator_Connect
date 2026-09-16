@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PublicCreatorProfilePage } from '../pages/public/PublicCreatorProfilePage';
@@ -12,9 +12,9 @@ import * as businessesApi from '../services/api/businesses';
 // Mock Firebase Client SDK
 vi.mock('../config/firebase', () => ({
   auth: { currentUser: null },
-  storage: {},
   default: {},
 }));
+
 
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => ({ currentUser: null })),
@@ -212,7 +212,7 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
         instagramUrl: 'https://instagram.com/elena',
         youtubeUrl: null,
         collaborationEmail: 'private-collab@elena.com',
-        profilePhotoUrl: null,
+        profilePhotoUrl: 'https://images.example.com/elena.jpg',
         isDiscoverable: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -249,6 +249,104 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
 
       // Private collaboration email is visible to owner
       expect(screen.getByDisplayValue('private-collab@elena.com')).toBeInTheDocument();
+    });
+
+    it('blocks saving when profile photo is cleared and displays Profile photo is required.', async () => {
+      const mockPrivateProfile: creatorsApi.CreatorPrivateProfile = {
+        id: 'cp-001',
+        userId: 'u-1',
+        name: 'Elena Rostova',
+        niche: 'Fashion & Style',
+        location: 'Milan, Italy',
+        bio: 'Editorial stylist and digital creator with extensive experience.',
+        specialties: ['Short-Form Video'],
+        instagramUrl: 'https://instagram.com/elena',
+        youtubeUrl: null,
+        collaborationEmail: 'private-collab@elena.com',
+        profilePhotoUrl: 'https://images.example.com/elena.jpg',
+        isDiscoverable: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(creatorsApi.getMyCreatorProfile).mockResolvedValue(mockPrivateProfile);
+
+      const { CreatorProfilePage } = await import('../pages/creator/CreatorProfilePage');
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/creator/profile']}>
+            <AuthProvider>
+              <CreatorProfilePage />
+            </AuthProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Creator Profile')).toBeInTheDocument();
+      });
+
+      // Click Remove photo
+      const removeBtn = screen.getByRole('button', { name: /Remove photo/i });
+      fireEvent.click(removeBtn);
+
+      // Click Save Changes
+      const saveBtn = screen.getByRole('button', { name: /Save Changes/i });
+      fireEvent.click(saveBtn);
+
+      expect(screen.getByText('Profile photo is required.')).toBeInTheDocument();
+      expect(creatorsApi.updateMyCreatorProfile).not.toHaveBeenCalled();
+    });
+
+    it('saves and updates profile normally when valid with photo', async () => {
+      const mockPrivateProfile: creatorsApi.CreatorPrivateProfile = {
+        id: 'cp-001',
+        userId: 'u-1',
+        name: 'Elena Rostova',
+        niche: 'Fashion & Style',
+        location: 'Milan, Italy',
+        bio: 'Editorial stylist and digital creator with extensive experience.',
+        specialties: ['Short-Form Video'],
+        instagramUrl: 'https://instagram.com/elena',
+        youtubeUrl: null,
+        collaborationEmail: 'private-collab@elena.com',
+        profilePhotoUrl: 'https://images.example.com/elena.jpg',
+        isDiscoverable: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(creatorsApi.getMyCreatorProfile).mockResolvedValue(mockPrivateProfile);
+      vi.mocked(creatorsApi.updateMyCreatorProfile).mockResolvedValue(mockPrivateProfile);
+
+      const { CreatorProfilePage } = await import('../pages/creator/CreatorProfilePage');
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/creator/profile']}>
+            <AuthProvider>
+              <CreatorProfilePage />
+            </AuthProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Creator Profile')).toBeInTheDocument();
+      });
+
+      // Click Save Changes
+      const saveBtn = screen.getByRole('button', { name: /Save Changes/i });
+      saveBtn.click();
+
+      await waitFor(() => {
+        expect(creatorsApi.updateMyCreatorProfile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            profilePhotoUrl: 'https://images.example.com/elena.jpg',
+          })
+        );
+      });
     });
   });
 
@@ -321,6 +419,43 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
       expect(screen.getByText(/Creator Name or Handle/i)).toBeInTheDocument();
       expect(screen.getByText(/Primary Niche/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Continue/i })).toBeInTheDocument();
+    });
+
+    it('blocks proceeding to step 2 when profile photo is missing and displays Profile photo is required.', async () => {
+      const { CreatorOnboardingPage } = await import('../pages/onboarding/CreatorOnboardingPage');
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/onboarding/creator']}>
+            <AuthProvider>
+              <CreatorOnboardingPage />
+            </AuthProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Complete Your Creator Profile')).toBeInTheDocument();
+      });
+
+      // Fill in name, niche, location, but leave photo empty
+      fireEvent.change(screen.getByPlaceholderText(/Maya Lin/i), {
+        target: { value: 'Maya Lin' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/Fitness & Health/i), {
+        target: { value: 'Fashion & Style' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/Los Angeles, CA/i), {
+        target: { value: 'Los Angeles, CA' },
+      });
+
+      // Click continue
+      const continueBtn = screen.getByRole('button', { name: /Continue/i });
+      fireEvent.click(continueBtn);
+
+      // Should show validation error and stay on step 1
+      expect(screen.getByText('Profile photo is required.')).toBeInTheDocument();
+      expect(screen.getByText('Basic Information')).toBeInTheDocument();
     });
   });
 

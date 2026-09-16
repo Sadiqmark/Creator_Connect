@@ -35,7 +35,7 @@ describe('Phase 6B Creator Discovery & Details Test Suite', () => {
     specialties: ['Food & Recipes', 'YouTube Long-form'],
     instagramUrl: null,
     youtubeUrl: 'https://youtube.com/@marcocooks',
-    profilePhotoUrl: null,
+    profilePhotoUrl: 'https://storage.googleapis.com/test/photo2.jpg',
     collaborationEmail: 'marco.private@kitchen.com',
     createdAt: new Date('2026-01-02'),
     updatedAt: new Date('2026-01-10'),
@@ -274,6 +274,23 @@ describe('Phase 6B Creator Discovery & Details Test Suite', () => {
       expect(res.body.creators).toHaveLength(1);
       expect(res.body.creators[0].id).toBe('cp-001');
     });
+
+    it('should exclude creators without profilePhotoUrl from returned discovery results', async () => {
+      jest.spyOn(prisma.creatorProfile, 'count').mockResolvedValue(2);
+      jest.spyOn(prisma.creatorProfile, 'findMany').mockResolvedValue([
+        sampleCreatorProfile,
+        {
+          ...sampleCreatorProfile2,
+          profilePhotoUrl: null, // Missing profile photo -> not discoverable
+        },
+      ] as any);
+
+      const res = await request(app).get('/api/v1/creators');
+
+      expect(res.status).toBe(200);
+      expect(res.body.creators).toHaveLength(1);
+      expect(res.body.creators[0].id).toBe('cp-001');
+    });
   });
 
   describe('3. GET /api/v1/creators/:creatorId — Public Creator Profile Details', () => {
@@ -309,7 +326,20 @@ describe('Phase 6B Creator Discovery & Details Test Suite', () => {
     it('should return 404 CREATOR_NOT_FOUND when creator does not exist', async () => {
       jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue(null);
 
-      const res = await request(app).get('/api/v1/creators/nonexistent-id');
+      const res = await request(app).get('/api/v1/creators/non-existent-id');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');
+    });
+
+    it('should return 404 CREATOR_NOT_FOUND when creator has no profilePhotoUrl', async () => {
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue({
+        ...sampleCreatorProfile,
+        profilePhotoUrl: null,
+        user: { status: 'ACTIVE' },
+      } as any);
+
+      const res = await request(app).get('/api/v1/creators/cp-001');
 
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');

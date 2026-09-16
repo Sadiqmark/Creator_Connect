@@ -6,14 +6,15 @@ import * as creatorService from '../services/creator.service';
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
 const updateCreatorProfileSchema = z.object({
-  name: z.string().trim().min(1, 'Creator name is required').max(150),
-  niche: z.string().trim().min(1, 'Primary niche is required').max(100),
-  location: z.string().trim().min(1, 'Location is required').max(150),
-  bio: z.string().trim().min(1, 'Bio is required').max(2000),
+  name: z.string().trim().min(1, 'Creator name is required').max(150).optional(),
+  niche: z.string().trim().min(1, 'Primary niche is required').max(100).optional(),
+  location: z.string().trim().min(1, 'Location is required').max(150).optional(),
+  bio: z.string().trim().min(1, 'Bio is required').max(2000).optional(),
   specialties: z
     .array(z.string().trim().min(1))
     .min(1, 'At least one specialty is required')
-    .max(10),
+    .max(10)
+    .optional(),
   instagramUrl: z
     .string()
     .trim()
@@ -36,13 +37,7 @@ const updateCreatorProfileSchema = z.object({
     .nullable()
     .optional(),
   profilePhotoUrl: z.string().trim().url().max(500).nullable().optional(),
-}).refine(
-  (data) => !!(data.instagramUrl || data.youtubeUrl),
-  {
-    message: 'At least one social profile (Instagram or YouTube) is required.',
-    path: ['socialProfile'],
-  }
-);
+});
 
 // ─── Controller functions ────────────────────────────────────────────────────
 
@@ -100,7 +95,13 @@ export const upsertMyProfile = async (req: Request, res: Response): Promise<void
     res.status(200).json({ profile });
   } catch (err: any) {
     if (err.statusCode === 422) {
-      res.status(422).json({ error: { code: err.code, message: err.message, requestId: req.id } });
+      res.status(422).json({
+        error: {
+          code: err.code === 'SOCIAL_PROFILE_REQUIRED' ? 'VALIDATION_ERROR' : err.code,
+          message: err.message,
+          requestId: req.id,
+        },
+      });
       return;
     }
     logger.error({ err }, 'Failed to upsert creator profile');
