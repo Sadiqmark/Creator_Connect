@@ -91,6 +91,7 @@ export type SafeInquiryDTO = {
   additionalRequirements: string | null;
   createdAt: string;
   expiresAt: string;
+  respondedAt?: string | null;
 };
 
 /**
@@ -247,5 +248,257 @@ export async function createInquiry(
     additionalRequirements: createdInquiry.additionalRequirements,
     createdAt: createdInquiry.createdAt.toISOString(),
     expiresAt: createdInquiry.expiresAt.toISOString(),
+    respondedAt: createdInquiry.respondedAt ? createdInquiry.respondedAt.toISOString() : null,
   };
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function mapToSafeInquiryDTO(
+  inquiry: {
+    id: string;
+    status: InquiryStatus;
+    collaborationType: string;
+    platform: string;
+    deliverables: string;
+    timelineStart: Date | null;
+    timelineEnd: Date | null;
+    brief: string;
+    additionalRequirements: string | null;
+    createdAt: Date;
+    expiresAt: Date;
+    respondedAt?: Date | null;
+  },
+  canonicalCreatorProfileId: string
+): SafeInquiryDTO {
+  return {
+    id: inquiry.id,
+    creatorId: canonicalCreatorProfileId,
+    status: inquiry.status,
+    collaborationType: inquiry.collaborationType,
+    platform: inquiry.platform,
+    deliverables: inquiry.deliverables,
+    timelineStart: inquiry.timelineStart
+      ? inquiry.timelineStart.toISOString().split('T')[0]
+      : null,
+    timelineEnd: inquiry.timelineEnd
+      ? inquiry.timelineEnd.toISOString().split('T')[0]
+      : null,
+    brief: inquiry.brief,
+    additionalRequirements: inquiry.additionalRequirements,
+    createdAt: inquiry.createdAt.toISOString(),
+    expiresAt: inquiry.expiresAt.toISOString(),
+    respondedAt: inquiry.respondedAt ? inquiry.respondedAt.toISOString() : null,
+  };
+}
+
+/**
+ * Executes an atomic creator-driven state transition (PENDING -> ACCEPTED or PENDING -> REJECTED).
+ * Enforces ownership check, privacy-preserving 404 for foreign inquiries, 409 for invalid state,
+ * atomic compare-and-swap update, notification creation, and audit event logging inside a single transaction.
+ */
+async function transitionInquiryByCreator(
+  creatorUserId: string,
+  inquiryId: string,
+  targetStatus: typeof InquiryStatus.ACCEPTED | typeof InquiryStatus.REJECTED
+): Promise<SafeInquiryDTO> {
+  if (!inquiryId || !UUID_REGEX.test(inquiryId)) {
+    throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
+  }
+
+  const now = new Date();
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Ownership and existence lookup
+    const inquiry = await tx.inquiry.findUnique({
+      where: { id: inquiryId },
+      include: {
+        creator: {
+          select: {
+            creatorProfile: {
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+
+    // Privacy-preserving: if not found or belongs to another creator, return 404
+    if (!inquiry || inquiry.creatorId !== creatorUserId) {
+      throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
+    }
+
+    // 2. Validate current state is PENDING
+    if (inquiry.status !== InquiryStatus.PENDING) {
+      throw new AppError('Inquiry is no longer pending.', 409, 'INVALID_INQUIRY_STATE');
+    }
+
+    // 3. Atomic conditional update (compare-and-swap)
+    const updateResult = await tx.inquiry.updateMany({
+      where: {
+        id: inquiryId,
+        creatorId: creatorUserId,
+        status: InquiryStatus.PENDING,
+      },
+      data: {
+        status: targetStatus,
+        respondedAt: now,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new AppError('Inquiry is no longer pending.', 409, 'INVALID_INQUIRY_STATE');
+    }
+
+    // 4. Create Notification for the business
+    const notificationType =
+      targetStatus === InquiryStatus.ACCEPTED
+        ? NotificationType.INQUIRY_ACCEPTED
+        : NotificationType.INQUIRY_REJECTED;
+
+    await tx.notification.create({
+      data: {
+        userId: inquiry.businessId,
+        type: notificationType,
+        referenceId: inquiry.id,
+        createdAt: now,
+      },
+    });
+
+    // 5. Create AuditEvent
+    const auditEventType =
+      targetStatus === InquiryStatus.ACCEPTED
+        ? AuditEventType.INQUIRY_ACCEPTED
+        : AuditEventType.INQUIRY_REJECTED;
+
+    await tx.auditEvent.create({
+      data: {
+        eventType: auditEventType,
+        actorUserId: creatorUserId,
+        resourceType: 'INQUIRY',
+        resourceId: inquiry.id,
+        metadata: {
+          previousStatus: InquiryStatus.PENDING,
+          newStatus: targetStatus,
+        },
+        createdAt: now,
+      },
+    });
+
+    const canonicalCreatorProfileId =
+      inquiry.creator.creatorProfile?.id ?? inquiry.creatorId;
+
+    return mapToSafeInquiryDTO(
+      {
+        ...inquiry,
+        status: targetStatus,
+        respondedAt: now,
+      },
+      canonicalCreatorProfileId
+    );
+  });
+}
+
+/**
+ * Creator accepts a PENDING collaboration inquiry.
+ * Atomically transitions PENDING -> ACCEPTED, sets respondedAt, creates notification and audit event.
+ */
+export async function acceptInquiry(
+  creatorUserId: string,
+  inquiryId: string
+): Promise<SafeInquiryDTO> {
+  return transitionInquiryByCreator(creatorUserId, inquiryId, InquiryStatus.ACCEPTED);
+}
+
+/**
+ * Creator rejects a PENDING collaboration inquiry.
+ * Atomically transitions PENDING -> REJECTED, sets respondedAt, creates notification and audit event.
+ */
+export async function rejectInquiry(
+  creatorUserId: string,
+  inquiryId: string
+): Promise<SafeInquiryDTO> {
+  return transitionInquiryByCreator(creatorUserId, inquiryId, InquiryStatus.REJECTED);
+}
+
+/**
+ * Core expiration transition function.
+ * Idempotently scans for PENDING inquiries where expiresAt <= now,
+ * transitions each atomically to EXPIRED without updating respondedAt,
+ * and emits an INQUIRY_EXPIRED notification and audit event inside a single transaction per item.
+ */
+export async function expireInquiries(batchSize = 100): Promise<{ expiredCount: number }> {
+  const now = new Date();
+
+  const staleInquiries = await prisma.inquiry.findMany({
+    where: {
+      status: InquiryStatus.PENDING,
+      expiresAt: { lte: now },
+    },
+    take: batchSize,
+    select: {
+      id: true,
+      businessId: true,
+      creatorId: true,
+    },
+  });
+
+  if (staleInquiries.length === 0) {
+    return { expiredCount: 0 };
+  }
+
+  let expiredCount = 0;
+
+  for (const item of staleInquiries) {
+    const transitioned = await prisma.$transaction(async (tx) => {
+      // Atomic conditional update
+      const updateResult = await tx.inquiry.updateMany({
+        where: {
+          id: item.id,
+          status: InquiryStatus.PENDING,
+          expiresAt: { lte: now },
+        },
+        data: {
+          status: InquiryStatus.EXPIRED,
+        },
+      });
+
+      if (updateResult.count === 0) {
+        return false;
+      }
+
+      // Create INQUIRY_EXPIRED notification for business
+      await tx.notification.create({
+        data: {
+          userId: item.businessId,
+          type: NotificationType.INQUIRY_EXPIRED,
+          referenceId: item.id,
+          createdAt: now,
+        },
+      });
+
+      // Create INQUIRY_EXPIRED audit event
+      await tx.auditEvent.create({
+        data: {
+          eventType: AuditEventType.INQUIRY_EXPIRED,
+          actorUserId: null,
+          resourceType: 'INQUIRY',
+          resourceId: item.id,
+          metadata: {
+            previousStatus: InquiryStatus.PENDING,
+            newStatus: InquiryStatus.EXPIRED,
+          },
+          createdAt: now,
+        },
+      });
+
+      return true;
+    });
+
+    if (transitioned) {
+      expiredCount++;
+    }
+  }
+
+  return { expiredCount };
 }
