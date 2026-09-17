@@ -398,6 +398,7 @@ describe('Phase 10B Creator Inquiry Management Test Suite', () => {
           websiteUrl: mockBusinessProfile.websiteUrl,
           instagramUrl: mockBusinessProfile.instagramUrl,
         },
+        contact: null,
       });
     });
 

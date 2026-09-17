@@ -526,6 +526,13 @@ export type BusinessInquiryListItemDTO = {
   };
 };
 
+export type InquiryCreatorContactDTO = {
+  name: string;
+  collaborationEmail: string | null;
+  instagramUrl: string | null;
+  youtubeUrl: string | null;
+};
+
 export type BusinessInquiryDetailDTO = {
   id: string;
   status: InquiryStatus;
@@ -551,6 +558,7 @@ export type BusinessInquiryDetailDTO = {
     instagramUrl: string | null;
     youtubeUrl: string | null;
   };
+  contact: InquiryCreatorContactDTO | null;
 };
 
 export type ListBusinessInquiriesResult = {
@@ -657,7 +665,8 @@ export async function listBusinessInquiries(
  * Retrieves full details of an inquiry for the authenticated business.
  * Privacy-preserving: returns 404 INQUIRY_NOT_FOUND if inquiry does not exist
  * or if it belongs to a different business.
- * Excludes private collaboration email and internal IDs.
+ * Controlled Contact Exchange: includes creator contact DTO strictly when
+ * inquiry status is ACCEPTED, creator user is ACTIVE, and not deleted.
  */
 export async function getBusinessInquiryById(
   businessUserId: string,
@@ -672,8 +681,14 @@ export async function getBusinessInquiryById(
     include: {
       creator: {
         select: {
+          id: true,
+          status: true,
+          deletedAt: true,
           creatorProfile: {
-            select: PUBLIC_CREATOR_SELECT,
+            select: {
+              ...PUBLIC_CREATOR_SELECT,
+              collaborationEmail: true,
+            },
           },
         },
       },
@@ -684,7 +699,26 @@ export async function getBusinessInquiryById(
     throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
   }
 
-  const cp = inquiry.creator.creatorProfile;
+  const creatorUser = inquiry.creator;
+  const cp = creatorUser?.creatorProfile;
+
+  if (!creatorUser || !cp) {
+    throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
+  }
+
+  const isEligibleForContact =
+    inquiry.status === InquiryStatus.ACCEPTED &&
+    creatorUser.status === 'ACTIVE' &&
+    creatorUser.deletedAt === null;
+
+  const contact: InquiryCreatorContactDTO | null = isEligibleForContact
+    ? {
+        name: cp.name,
+        collaborationEmail: cp.collaborationEmail ?? null,
+        instagramUrl: cp.instagramUrl ?? null,
+        youtubeUrl: cp.youtubeUrl ?? null,
+      }
+    : null;
 
   return {
     id: inquiry.id,
@@ -705,18 +739,20 @@ export async function getBusinessInquiryById(
     respondedAt: inquiry.respondedAt ? inquiry.respondedAt.toISOString() : null,
     closedAt: inquiry.closedAt ? inquiry.closedAt.toISOString() : null,
     creator: {
-      id: cp?.id ?? inquiry.creatorId,
-      name: cp?.name ?? 'Creator',
-      profilePhotoUrl: cp?.profilePhotoUrl ?? null,
-      niche: cp?.niche ?? '',
-      location: cp?.location ?? '',
-      bio: cp?.bio ?? '',
-      specialties: cp?.specialties ?? [],
-      instagramUrl: cp?.instagramUrl ?? null,
-      youtubeUrl: cp?.youtubeUrl ?? null,
+      id: cp.id,
+      name: cp.name,
+      profilePhotoUrl: cp.profilePhotoUrl ?? null,
+      niche: cp.niche,
+      location: cp.location,
+      bio: cp.bio,
+      specialties: cp.specialties,
+      instagramUrl: cp.instagramUrl ?? null,
+      youtubeUrl: cp.youtubeUrl ?? null,
     },
+    contact,
   };
 }
+
 
 // ─── Creator Inquiry Management DTOs & Services (Phase 10) ───────────────────
 
@@ -750,6 +786,13 @@ export type CreatorInquiryListItemDTO = {
   business: CreatorInquiryBusinessSummaryDTO;
 };
 
+export type InquiryBusinessContactDTO = {
+  businessName: string;
+  collaborationEmail: string | null;
+  websiteUrl: string | null;
+  instagramUrl: string | null;
+};
+
 export type CreatorInquiryDetailDTO = {
   id: string;
   status: InquiryStatus;
@@ -765,6 +808,7 @@ export type CreatorInquiryDetailDTO = {
   respondedAt: string | null;
   closedAt: string | null;
   business: CreatorInquiryBusinessDetailDTO;
+  contact: InquiryBusinessContactDTO | null;
 };
 
 export type ListCreatorInquiriesResult = {
@@ -873,7 +917,8 @@ export async function listCreatorInquiries(
  * Retrieves full details of an inquiry for the authenticated creator.
  * Privacy-preserving: returns 404 INQUIRY_NOT_FOUND if inquiry does not exist,
  * has malformed UUID, or if it belongs to a different creator.
- * Excludes private collaboration email and internal IDs.
+ * Controlled Contact Exchange: includes business contact DTO strictly when
+ * inquiry status is ACCEPTED, business user is ACTIVE, and not deleted.
  */
 export async function getCreatorInquiryById(
   creatorUserId: string,
@@ -888,8 +933,14 @@ export async function getCreatorInquiryById(
     include: {
       business: {
         select: {
+          id: true,
+          status: true,
+          deletedAt: true,
           businessProfile: {
-            select: PUBLIC_BUSINESS_SELECT,
+            select: {
+              ...PUBLIC_BUSINESS_SELECT,
+              collaborationEmail: true,
+            },
           },
         },
       },
@@ -900,7 +951,26 @@ export async function getCreatorInquiryById(
     throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
   }
 
-  const bp = inquiry.business.businessProfile;
+  const businessUser = inquiry.business;
+  const bp = businessUser?.businessProfile;
+
+  if (!businessUser || !bp) {
+    throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
+  }
+
+  const isEligibleForContact =
+    inquiry.status === InquiryStatus.ACCEPTED &&
+    businessUser.status === 'ACTIVE' &&
+    businessUser.deletedAt === null;
+
+  const contact: InquiryBusinessContactDTO | null = isEligibleForContact
+    ? {
+        businessName: bp.businessName,
+        collaborationEmail: bp.collaborationEmail ?? null,
+        websiteUrl: bp.websiteUrl ?? null,
+        instagramUrl: bp.instagramUrl ?? null,
+      }
+    : null;
 
   return {
     id: inquiry.id,
@@ -921,18 +991,17 @@ export async function getCreatorInquiryById(
     respondedAt: inquiry.respondedAt ? inquiry.respondedAt.toISOString() : null,
     closedAt: inquiry.closedAt ? inquiry.closedAt.toISOString() : null,
     business: {
-      id: bp?.id ?? inquiry.businessId,
-      businessName: bp?.businessName ?? '',
-      logoUrl: bp?.logoUrl ?? null,
-      category: bp?.category ?? '',
-      description: bp?.description ?? '',
-      city: bp?.city ?? '',
-      stateOrProvince: bp?.stateOrProvince ?? '',
-      country: bp?.country ?? '',
-      websiteUrl: bp?.websiteUrl ?? null,
-      instagramUrl: bp?.instagramUrl ?? null,
+      id: bp.id,
+      businessName: bp.businessName,
+      logoUrl: bp.logoUrl ?? null,
+      category: bp.category,
+      description: bp.description,
+      city: bp.city,
+      stateOrProvince: bp.stateOrProvince,
+      country: bp.country,
+      websiteUrl: bp.websiteUrl ?? null,
+      instagramUrl: bp.instagramUrl ?? null,
     },
+    contact,
   };
 }
-
-
