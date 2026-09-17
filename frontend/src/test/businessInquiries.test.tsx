@@ -63,6 +63,7 @@ describe('Phase 9B Frontend Business Inquiry Management Test Suite', () => {
       instagramUrl: 'https://instagram.com/elenarostova',
       youtubeUrl: 'https://youtube.com/@elenarostova',
     },
+    contact: null,
   };
 
   beforeEach(() => {

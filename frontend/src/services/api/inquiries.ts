@@ -70,6 +70,13 @@ export interface BusinessInquiryListItem {
   creator: BusinessInquiryCreatorSummary;
 }
 
+export interface InquiryCreatorContactDTO {
+  name: string;
+  collaborationEmail: string | null;
+  instagramUrl: string | null;
+  youtubeUrl: string | null;
+}
+
 export interface BusinessInquiryDetail {
   id: string;
   status: InquiryStatus;
@@ -85,6 +92,7 @@ export interface BusinessInquiryDetail {
   respondedAt: string | null;
   closedAt: string | null;
   creator: BusinessInquiryCreatorDetail;
+  contact: InquiryCreatorContactDTO | null;
 }
 
 export interface ListBusinessInquiriesParams {
@@ -167,6 +175,13 @@ export interface CreatorInquiryListItem {
   business: CreatorInquiryBusinessSummary;
 }
 
+export interface InquiryBusinessContactDTO {
+  businessName: string;
+  collaborationEmail: string | null;
+  websiteUrl: string | null;
+  instagramUrl: string | null;
+}
+
 export interface CreatorInquiryDetail {
   id: string;
   status: InquiryStatus;
@@ -182,6 +197,7 @@ export interface CreatorInquiryDetail {
   respondedAt: string | null;
   closedAt: string | null;
   business: CreatorInquiryBusinessDetail;
+  contact: InquiryBusinessContactDTO | null;
 }
 
 export interface ListCreatorInquiriesParams {

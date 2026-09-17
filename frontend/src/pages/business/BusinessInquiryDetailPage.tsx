@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getBusinessInquiryDetail, InquiryStatus } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { CreatorContactCard } from '../../components/inquiry/InquiryContactCard';
 import {
   ArrowLeft,
   Clock,
@@ -258,8 +259,12 @@ export const BusinessInquiryDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Col: Creator Profile Card */}
+              {/* Right Col: Creator Profile & Contact */}
               <div className="space-y-6">
+                {inquiry.contact && (
+                  <CreatorContactCard contact={inquiry.contact} />
+                )}
+
                 <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-5 sticky top-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xs font-bold uppercase tracking-wider text-foreground-muted">

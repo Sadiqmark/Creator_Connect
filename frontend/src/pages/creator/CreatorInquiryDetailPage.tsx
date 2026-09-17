@@ -12,6 +12,7 @@ import {
   InquiryActionConfirmationModal,
   InquiryActionType,
 } from '../../components/inquiry/InquiryActionConfirmationModal';
+import { BusinessContactCard } from '../../components/inquiry/InquiryContactCard';
 import {
   ArrowLeft,
   Clock,
@@ -371,8 +372,12 @@ export const CreatorInquiryDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Business Profile & Lifecycle */}
+          {/* Right Column: Business Profile, Contact & Lifecycle */}
           <div className="space-y-6">
+            {inquiry.contact && (
+              <BusinessContactCard contact={inquiry.contact} />
+            )}
+
             {/* Brand Partner Card */}
             <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-accent">

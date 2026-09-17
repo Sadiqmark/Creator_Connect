@@ -85,6 +85,7 @@ describe('Phase 10C Frontend Creator Inquiry Management Test Suite', () => {
       websiteUrl: 'https://luminafashion.example.com',
       instagramUrl: 'https://instagram.com/luminafashion',
     },
+    contact: null,
   };
 
   beforeEach(() => {
