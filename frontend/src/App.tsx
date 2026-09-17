@@ -14,6 +14,8 @@ import { BusinessDashboard } from './pages/dashboards/BusinessDashboard';
 import { CreatorOnboardingPage } from './pages/onboarding/CreatorOnboardingPage';
 import { BusinessOnboardingPage } from './pages/onboarding/BusinessOnboardingPage';
 import { CreatorProfilePage } from './pages/creator/CreatorProfilePage';
+import { CreatorInquiriesPage } from './pages/creator/CreatorInquiriesPage';
+import { CreatorInquiryDetailPage } from './pages/creator/CreatorInquiryDetailPage';
 import { BusinessProfilePage } from './pages/business/BusinessProfilePage';
 import { PublicCreatorProfilePage } from './pages/public/PublicCreatorProfilePage';
 import { CreatorDiscoveryPage } from './pages/public/CreatorDiscoveryPage';
@@ -104,6 +106,22 @@ export const App: React.FC = () => {
           element={
             <ProtectedRoute allowedRole={UserRole.CREATOR}>
               <CreatorProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/creator/inquiries"
+          element={
+            <ProtectedRoute allowedRole={UserRole.CREATOR}>
+              <CreatorInquiriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/creator/inquiries/:inquiryId"
+          element={
+            <ProtectedRoute allowedRole={UserRole.CREATOR}>
+              <CreatorInquiryDetailPage />
             </ProtectedRoute>
           }
         />

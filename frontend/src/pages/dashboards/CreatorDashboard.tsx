@@ -19,6 +19,7 @@ import {
   User,
   Eye,
   Loader2,
+  ArrowRight,
 } from 'lucide-react';
 
 export const CreatorDashboard: React.FC = () => {
@@ -234,26 +235,35 @@ export const CreatorDashboard: React.FC = () => {
             {/* Recent Inquiries List */}
             <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-foreground">Recent Collaboration Inquiries</h2>
-                <span className="text-xs text-foreground-muted">Latest brand proposals</span>
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Recent Collaboration Inquiries</h2>
+                  <span className="text-xs text-foreground-muted">Latest brand proposals</span>
+                </div>
+                <Link
+                  to="/creator/inquiries"
+                  className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                >
+                  View All <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
 
               {summary?.recentInquiries && summary.recentInquiries.length > 0 ? (
                 <div className="divide-y divide-border">
                   {summary.recentInquiries.map((inq) => (
-                    <div
+                    <Link
                       key={inq.id}
-                      className="py-3.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0"
+                      to={`/creator/inquiries/${inq.id}`}
+                      className="py-3.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0 hover:bg-surface-muted/50 rounded-xl px-2 -mx-2 transition-colors group"
                     >
                       <div className="flex items-center gap-3">
                         <AvatarWithFallback
                           src={inq.businessLogoUrl}
-                          alt={inq.businessName || 'Brand'}
+                          alt={inq.businessName || ''}
                           size="md"
                         />
                         <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            {inq.businessName || 'Brand Partner'}
+                          <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
+                            {inq.businessName}
                           </p>
                           <p className="text-xs text-foreground-muted">
                             {inq.collaborationType} • Received on{' '}
@@ -273,7 +283,7 @@ export const CreatorDashboard: React.FC = () => {
                       >
                         {inq.status}
                       </span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
