@@ -13,11 +13,11 @@ export const BUSINESS_CATEGORIES = [
   'Sustainability & Environment', 'Other',
 ] as const;
 
-// ─── Safe public select (never includes collaborationEmail) ──────────────────
+// ─── Safe public select (never includes collaborationEmail or userId) ────────
 
 export const PUBLIC_BUSINESS_SELECT = {
   id: true,
-  userId: true,
+  // userId intentionally omitted for public profile privacy
   businessName: true,
   category: true,
   description: true,
@@ -36,7 +36,6 @@ export const PUBLIC_BUSINESS_SELECT = {
 
 export type BusinessPublicDTO = {
   id: string;
-  userId: string;
   businessName: string;
   category: string;
   description: string;
@@ -51,6 +50,7 @@ export type BusinessPublicDTO = {
 };
 
 export type BusinessPrivateDTO = BusinessPublicDTO & {
+  userId: string;
   collaborationEmail: string | null;
 };
 

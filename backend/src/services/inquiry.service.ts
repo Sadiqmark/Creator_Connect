@@ -579,6 +579,7 @@ export async function listBusinessInquiries(
   businessUserId: string,
   options: {
     status?: InquiryStatus;
+    creatorId?: string;
     page?: number;
     limit?: number;
   }
@@ -596,6 +597,16 @@ export async function listBusinessInquiries(
       throw new AppError('Invalid status filter.', 400, 'INVALID_STATUS_FILTER');
     }
     where.status = options.status;
+  }
+
+  if (options.creatorId) {
+    if (!UUID_REGEX.test(options.creatorId)) {
+      throw new AppError('Invalid creator ID format.', 400, 'VALIDATION_ERROR');
+    }
+    where.OR = [
+      { creatorId: options.creatorId },
+      { creator: { creatorProfile: { id: options.creatorId } } },
+    ];
   }
 
   const [total, inquiries] = await Promise.all([

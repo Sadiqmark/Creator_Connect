@@ -175,4 +175,60 @@ describe('Phase 7B Frontend Inquiry Form Modal Test Suite', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('invalidates canonical query keys (active-inquiry, business-inquiries, business-dashboard) upon successful inquiry submission', async () => {
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const mockCreatedInquiry: inquiriesApi.InquiryDTO = {
+      id: 'inq-new-1',
+      creatorId: mockCreator.id,
+      status: 'PENDING',
+      collaborationType: 'Sponsored Reel',
+      platform: 'Instagram',
+      deliverables: '1 Reel',
+      timelineStart: null,
+      timelineEnd: null,
+      brief: 'Valid campaign brief for testing query invalidations.',
+      additionalRequirements: null,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date().toISOString(),
+    };
+
+    vi.mocked(inquiriesApi.createInquiry).mockResolvedValue({ inquiry: mockCreatedInquiry });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <InquiryFormModal
+          creator={mockCreator}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+
+    fireEvent.change(screen.getByLabelText(/Collaboration Type/i), {
+      target: { value: 'Sponsored Reel' },
+    });
+    fireEvent.change(screen.getByLabelText(/Expected Deliverables/i), {
+      target: { value: '1 Dedicated 60s Reel + 3 Stories with Link' },
+    });
+    fireEvent.change(screen.getByLabelText(/Collaboration Brief/i), {
+      target: { value: 'Valid campaign brief for testing query invalidations.' },
+    });
+
+    const submitBtn = screen.getByRole('button', { name: /Send Inquiry/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['active-inquiry', mockCreator.id],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['business-inquiries'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['business-dashboard'],
+      });
+    });
+  });
 });

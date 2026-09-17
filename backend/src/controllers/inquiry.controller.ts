@@ -39,10 +39,11 @@ export async function listBusinessInquiriesHandler(
       throw new AppError('Authentication required.', 401, 'UNAUTHORIZED');
     }
 
-    const { status, page, limit } = req.query;
+    const { status, page, limit, creatorId } = req.query;
 
     const result = await listBusinessInquiries(businessUserId, {
       status: status ? (status as any) : undefined,
+      creatorId: typeof creatorId === 'string' ? creatorId : undefined,
       page: page ? parseInt(page as string, 10) : undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
     });

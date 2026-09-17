@@ -97,6 +97,7 @@ export interface BusinessInquiryDetail {
 
 export interface ListBusinessInquiriesParams {
   status?: InquiryStatus | 'ALL';
+  creatorId?: string;
   page?: number;
   limit?: number;
 }
@@ -121,6 +122,9 @@ export const listBusinessInquiries = async (
   const queryParams: Record<string, any> = {};
   if (params?.status && params.status !== 'ALL') {
     queryParams.status = params.status;
+  }
+  if (params?.creatorId) {
+    queryParams.creatorId = params.creatorId;
   }
   if (params?.page) {
     queryParams.page = params.page;

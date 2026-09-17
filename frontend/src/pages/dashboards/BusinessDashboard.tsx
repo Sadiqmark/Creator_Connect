@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import {
   getBusinessDashboard,
@@ -25,36 +26,25 @@ import {
 export const BusinessDashboard: React.FC = () => {
   const { appUser, signOut } = useAuth();
 
-  const [summary, setSummary] = useState<BusinessDashboardSummary | null>(null);
-  const [profile, setProfile] = useState<BusinessPrivateProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: summary = null,
+    isLoading: isSummaryLoading,
+    error: summaryError,
+  } = useQuery<BusinessDashboardSummary>({
+    queryKey: ['business-dashboard'],
+    queryFn: getBusinessDashboard,
+  });
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [dashSummary, profileData] = await Promise.allSettled([
-          getBusinessDashboard(),
-          getMyBusinessProfile(),
-        ]);
+  const {
+    data: profile = null,
+    isLoading: isProfileLoading,
+  } = useQuery<BusinessPrivateProfile>({
+    queryKey: ['business-profile-me'],
+    queryFn: getMyBusinessProfile,
+  });
 
-        if (dashSummary.status === 'fulfilled') {
-          setSummary(dashSummary.value);
-        }
-        if (profileData.status === 'fulfilled') {
-          setProfile(profileData.value);
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load business dashboard.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
+  const isLoading = isSummaryLoading || isProfileLoading;
+  const error = summaryError ? ((summaryError as any).message || 'Failed to load business dashboard.') : null;
 
   return (
     <div className="min-h-screen bg-background">

@@ -490,11 +490,14 @@ describe('Phase 11A — Controlled Contact Exchange Integration Test Suite', () 
       expect(res.body.profile).not.toHaveProperty('collaborationEmail');
       expect(JSON.stringify(res.body)).not.toContain('collab-partnerships@luminastudio.com');
 
-      // Verify PUBLIC_BUSINESS_SELECT was strictly utilized
+      // Verify PUBLIC_BUSINESS_SELECT was strictly utilized (neither collaborationEmail nor internal userId)
       expect(findUniqueSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: mockBusinessProfileA.id },
-          select: expect.not.objectContaining({ collaborationEmail: true }),
+          select: expect.not.objectContaining({
+            collaborationEmail: true,
+            userId: true,
+          }),
         })
       );
     });

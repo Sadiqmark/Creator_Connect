@@ -359,10 +359,9 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
       expect(res.body.profile).not.toHaveProperty('collaborationEmail');
     });
 
-    it('should strictly EXCLUDE collaborationEmail in public GET /api/v1/businesses/:businessId', async () => {
-      jest.spyOn(prisma.businessProfile, 'findUnique').mockResolvedValue({
+    it('should strictly EXCLUDE internal userId, firebaseUid, User.email, and collaborationEmail in public GET /api/v1/businesses/:businessId', async () => {
+      const findUniqueSpy = jest.spyOn(prisma.businessProfile, 'findUnique').mockResolvedValue({
         id: 'bp-001',
-        userId: mockBusinessUser.id,
         businessName: 'Acme Corp',
         category: 'Technology',
         description: 'Tech brand.',
@@ -380,8 +379,25 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.profile.businessName).toBe('Acme Corp');
+      expect(res.body.profile.userId).toBeUndefined();
+      expect(res.body.profile).not.toHaveProperty('userId');
+      expect(res.body.profile.firebaseUid).toBeUndefined();
+      expect(res.body.profile).not.toHaveProperty('firebaseUid');
+      expect(res.body.profile.email).toBeUndefined();
+      expect(res.body.profile).not.toHaveProperty('email');
       expect(res.body.profile.collaborationEmail).toBeUndefined();
       expect(res.body.profile).not.toHaveProperty('collaborationEmail');
+
+      // Verify PUBLIC_BUSINESS_SELECT strictly excludes userId and collaborationEmail
+      expect(findUniqueSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'bp-001' },
+          select: expect.not.objectContaining({
+            userId: true,
+            collaborationEmail: true,
+          }),
+        })
+      );
     });
 
     it('should include collaborationEmail in private GET /api/v1/businesses/me', async () => {

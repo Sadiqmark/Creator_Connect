@@ -172,8 +172,9 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
     },
     onSuccess: (res) => {
       setIsSubmittedSuccess(true);
-      queryClient.invalidateQueries({ queryKey: ['inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['active-inquiry', creator.id] });
+      queryClient.invalidateQueries({ queryKey: ['business-inquiries'] });
+      queryClient.invalidateQueries({ queryKey: ['business-dashboard'] });
       if (onSuccess) {
         onSuccess(res.inquiry);
       }

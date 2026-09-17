@@ -157,7 +157,6 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
     it('renders business brand card and STRICTLY OMITS collaborationEmail', async () => {
       const mockBusiness: businessesApi.BusinessPublicProfile = {
         id: 'biz-123',
-        userId: 'user-biz',
         businessName: 'Lumina Activewear',
         category: 'Fitness & Wellness',
         description: 'Eco-conscious athletic wear designed for performance.',
@@ -189,9 +188,15 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
         expect(screen.getByText('Lumina Activewear')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Fitness & Wellness')).toBeInTheDocument();
+      expect(screen.getByText(/Fitness & Wellness/)).toBeInTheDocument();
       expect(screen.getByText(/Denver, CO, USA/)).toBeInTheDocument();
       expect(screen.getByText(/Eco-conscious athletic wear/)).toBeInTheDocument();
+
+      // Privacy checks: internal userId and collaborationEmail are strictly absent
+      expect((mockBusiness as any).userId).toBeUndefined();
+      expect((mockBusiness as any).collaborationEmail).toBeUndefined();
+      expect(screen.queryByText(/user-biz/)).toBeNull();
+      expect(screen.queryByText(/@luminaactive.com/)).toBeNull();
 
       // STRICT PRIVACY CHECK: Collaboration email address must NOT be present in the document
       expect(screen.queryByText(/@/)).toBeNull();

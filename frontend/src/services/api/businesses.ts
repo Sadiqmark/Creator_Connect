@@ -2,7 +2,6 @@ import { apiClient } from './client';
 
 export interface BusinessPublicProfile {
   id: string;
-  userId: string;
   businessName: string;
   category: string;
   description: string;
@@ -17,6 +16,7 @@ export interface BusinessPublicProfile {
 }
 
 export interface BusinessPrivateProfile extends BusinessPublicProfile {
+  userId: string;
   collaborationEmail: string | null;
 }
 

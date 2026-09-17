@@ -308,6 +308,46 @@ describe('Phase 9B Business Inquiry Management Test Suite', () => {
         })
       );
     });
+
+    it('should filter inquiries by creatorId when valid creatorId UUID query parameter is provided', async () => {
+      const countSpy = jest.spyOn(prisma.inquiry, 'count').mockResolvedValue(1);
+      const findManySpy = jest.spyOn(prisma.inquiry, 'findMany').mockResolvedValue([sampleInquiryA as any]);
+
+      const res = await request(app)
+        .get(`/api/v1/inquiries?creatorId=${mockCreatorProfile.id}`)
+        .set('Authorization', 'Bearer biz-token');
+
+      expect(res.status).toBe(200);
+      expect(countSpy).toHaveBeenCalledWith({
+        where: {
+          businessId: mockBusinessUserA.id,
+          OR: [
+            { creatorId: mockCreatorProfile.id },
+            { creator: { creatorProfile: { id: mockCreatorProfile.id } } },
+          ],
+        },
+      });
+      expect(findManySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            businessId: mockBusinessUserA.id,
+            OR: [
+              { creatorId: mockCreatorProfile.id },
+              { creator: { creatorProfile: { id: mockCreatorProfile.id } } },
+            ],
+          },
+        })
+      );
+    });
+
+    it('should return 400 VALIDATION_ERROR when an invalid creatorId UUID query parameter is passed', async () => {
+      const res = await request(app)
+        .get('/api/v1/inquiries?creatorId=not-a-valid-uuid')
+        .set('Authorization', 'Bearer biz-token');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
   });
 
   // ─── 3. GET /api/v1/inquiries/:inquiryId (DETAIL) ───────────────────────────

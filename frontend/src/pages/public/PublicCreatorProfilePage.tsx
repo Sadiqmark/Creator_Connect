@@ -9,6 +9,7 @@ import {
   saveCreator,
   unsaveCreator,
 } from '../../services/api/savedCreators';
+import { listBusinessInquiries } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import { InquiryFormModal } from '../../components/inquiry/InquiryFormModal';
 import {
@@ -17,6 +18,7 @@ import {
   Youtube,
   Bookmark,
   Send,
+  CheckCircle2,
   ArrowLeft,
   Loader2,
   AlertCircle,
@@ -51,6 +53,17 @@ export const PublicCreatorProfilePage: React.FC = () => {
     queryFn: getSavedCreatorIds,
     enabled: isBusiness,
   });
+
+  // TanStack Query for active inquiry check (business only)
+  const { data: creatorInquiriesData } = useQuery({
+    queryKey: ['active-inquiry', creatorId],
+    queryFn: () => listBusinessInquiries({ creatorId }),
+    enabled: isBusiness && Boolean(creatorId),
+  });
+
+  const activeInquiry = creatorInquiriesData?.inquiries?.find(
+    (inq) => inq.status === 'PENDING' || inq.status === 'ACCEPTED'
+  );
 
   const isSaved = Boolean(creatorId && savedCreatorIds.includes(creatorId));
 
@@ -207,14 +220,24 @@ export const PublicCreatorProfilePage: React.FC = () => {
               )}
 
               {!isCreator && (
-                <button
-                  type="button"
-                  onClick={handleInquiryClick}
-                  className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-accent/90 flex items-center justify-center gap-2 shadow-subtle transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                  Send Inquiry
-                </button>
+                activeInquiry ? (
+                  <Link
+                    to={`/business/inquiries/${activeInquiry.id}`}
+                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-sm font-semibold text-accent bg-accent/10 border border-accent/30 hover:bg-accent/20 flex items-center justify-center gap-2 shadow-subtle transition-colors"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-accent" />
+                    Inquiry Active
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleInquiryClick}
+                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-accent hover:bg-accent/90 flex items-center justify-center gap-2 shadow-subtle transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                    Send Inquiry
+                  </button>
+                )
               )}
             </div>
           </div>
