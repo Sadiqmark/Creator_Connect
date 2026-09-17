@@ -5,6 +5,8 @@ import {
   rejectInquiry,
   listBusinessInquiries,
   getBusinessInquiryById,
+  listCreatorInquiries,
+  getCreatorInquiryById,
 } from '../services/inquiry.service';
 import { AppError } from '../middleware/errorHandler';
 
@@ -119,4 +121,53 @@ export async function rejectInquiryHandler(
     next(error);
   }
 }
+
+export async function listCreatorInquiriesHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const creatorUserId = req.user?.id;
+    if (!creatorUserId) {
+      throw new AppError('Authentication required.', 401, 'UNAUTHORIZED');
+    }
+
+    const { status, page, limit } = req.query;
+
+    const result = await listCreatorInquiries(creatorUserId, {
+      status: status ? (status as any) : undefined,
+      page: page ? parseInt(page as string, 10) : undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getCreatorInquiryHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const creatorUserId = req.user?.id;
+    if (!creatorUserId) {
+      throw new AppError('Authentication required.', 401, 'UNAUTHORIZED');
+    }
+
+    const { inquiryId } = req.params;
+    if (!inquiryId) {
+      throw new AppError('Inquiry ID is required.', 400, 'VALIDATION_ERROR');
+    }
+
+    const inquiry = await getCreatorInquiryById(creatorUserId, inquiryId);
+    res.status(200).json({ inquiry });
+  } catch (error) {
+    next(error);
+  }
+}
+
 

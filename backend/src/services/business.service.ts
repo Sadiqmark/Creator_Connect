@@ -15,7 +15,7 @@ export const BUSINESS_CATEGORIES = [
 
 // ─── Safe public select (never includes collaborationEmail) ──────────────────
 
-const PUBLIC_BUSINESS_SELECT = {
+export const PUBLIC_BUSINESS_SELECT = {
   id: true,
   userId: true,
   businessName: true,
