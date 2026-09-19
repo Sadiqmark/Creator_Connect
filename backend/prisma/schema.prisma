@@ -18,6 +18,7 @@ enum UserRole {
 enum AccountStatus {
   ACTIVE
   DELETED
+  DEACTIVATED
 }
 
 enum InquiryStatus {
@@ -44,6 +45,9 @@ enum AuditEventType {
   INQUIRY_CLOSED
   COLLABORATION_EMAIL_UPDATED
   ACCOUNT_DELETED
+  ACCOUNT_DEACTIVATED
+  ACCOUNT_REACTIVATED
+  ACCOUNT_PERMANENTLY_DELETED
 }
 
 model User {
@@ -52,9 +56,11 @@ model User {
   email        String        @unique @db.VarChar(255)
   role         UserRole
   status       AccountStatus @default(ACTIVE)
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deactivatedAt        DateTime?     @map("deactivated_at") @db.Timestamptz
+  deletionScheduledAt  DateTime?     @map("deletion_scheduled_at") @db.Timestamptz
+  deletedAt            DateTime?     @map("deleted_at") @db.Timestamptz
 
   creatorProfile    CreatorProfile?
   businessProfile   BusinessProfile?
@@ -65,6 +71,7 @@ model User {
   notifications     Notification[]
 
   @@index([role, status])
+  @@index([status, deletionScheduledAt])
   @@map("users")
 }
 
@@ -179,4 +186,27 @@ model AuditEvent {
   @@index([resourceType, resourceId, createdAt(sort: Desc)])
   @@index([actorUserId])
   @@map("audit_events")
+}
+
+model EmailReservation {
+  id            String   @id @default(uuid()) @db.Uuid
+  emailHash     String   @unique @map("email_hash") @db.VarChar(64)
+  reservedUntil DateTime @map("reserved_until") @db.Timestamptz
+  reason        String   @default("ACCOUNT_DELETION") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([reservedUntil])
+  @@map("email_reservations")
+}
+
+model PendingFirebaseDeletion {
+  id            String    @id @default(uuid()) @db.Uuid
+  firebaseUid   String    @unique @map("firebase_uid") @db.VarChar(128)
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz
+  lastError     String?   @map("last_error") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([lastAttemptAt, createdAt])
+  @@map("pending_firebase_deletions")
 }
