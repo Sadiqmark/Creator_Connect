@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './middleware/logger';
+import { startInquiryExpirationRunner, stopInquiryExpirationRunner } from './jobs/expirationRunner';
 
 const app = createApp();
 
@@ -12,10 +13,14 @@ const server = app.listen(env.PORT, () => {
     },
     `🚀 Creator Connect Backend API listening on http://localhost:${env.PORT}`
   );
+
+  // Initialize inquiry expiration runner (immediate sweep + 15m recurring interval)
+  startInquiryExpirationRunner();
 });
 
 const gracefulShutdown = (signal: string) => {
   logger.info({ signal }, `Received ${signal}. Starting graceful shutdown...`);
+  stopInquiryExpirationRunner();
   server.close(() => {
     logger.info('HTTP server closed cleanly. Exiting process.');
     process.exit(0);

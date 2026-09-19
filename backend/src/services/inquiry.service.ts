@@ -329,9 +329,9 @@ async function transitionInquiryByCreator(
       throw new AppError('Inquiry not found.', 404, 'INQUIRY_NOT_FOUND');
     }
 
-    // 2. Validate current state is PENDING
-    if (inquiry.status !== InquiryStatus.PENDING) {
-      throw new AppError('Inquiry is no longer pending.', 409, 'INVALID_INQUIRY_STATE');
+    // 2. Validate current state is PENDING and not expired
+    if (inquiry.status !== InquiryStatus.PENDING || inquiry.expiresAt <= now) {
+      throw new AppError('Inquiry is no longer pending or has expired.', 409, 'INVALID_INQUIRY_STATE');
     }
 
     // 3. Atomic conditional update (compare-and-swap)
@@ -340,6 +340,7 @@ async function transitionInquiryByCreator(
         id: inquiryId,
         creatorId: creatorUserId,
         status: InquiryStatus.PENDING,
+        expiresAt: { gt: now },
       },
       data: {
         status: targetStatus,
@@ -348,7 +349,7 @@ async function transitionInquiryByCreator(
     });
 
     if (updateResult.count === 0) {
-      throw new AppError('Inquiry is no longer pending.', 409, 'INVALID_INQUIRY_STATE');
+      throw new AppError('Inquiry is no longer pending or has expired.', 409, 'INVALID_INQUIRY_STATE');
     }
 
     // 4. Create Notification for the business

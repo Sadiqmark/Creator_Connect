@@ -108,8 +108,8 @@ export const BusinessInquiryDetailPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Navigation / Breadcrumbs */}
-        <div className="flex items-center justify-between">
+        {/* Top Header / Breadcrumb */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <button
             onClick={() => navigate('/business/inquiries')}
             className="flex items-center gap-1.5 text-xs font-semibold text-foreground-muted hover:text-foreground transition-colors cursor-pointer"

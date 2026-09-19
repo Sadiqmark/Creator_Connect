@@ -10,6 +10,7 @@ import {
   unsaveCreator,
 } from '../../services/api/savedCreators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Search,
   MapPin,
@@ -232,6 +233,7 @@ export const CreatorDiscoveryPage: React.FC = () => {
           <nav className="flex items-center gap-3 text-xs font-semibold" aria-label="Main Navigation">
             {appUser ? (
               <>
+                <HeaderNotificationDropdown />
                 {isBusiness && (
                   <Link
                     to="/business/saved-creators"

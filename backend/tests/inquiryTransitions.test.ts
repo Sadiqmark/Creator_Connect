@@ -122,11 +122,11 @@ describe('Phase 8B Inquiry State Machine Test Suite', () => {
       // Verify atomic compare-and-swap update query
       expect(updateManySpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
+          where: expect.objectContaining({
             id: mockInquiryId,
             creatorId: mockCreatorUserA.id,
             status: InquiryStatus.PENDING,
-          },
+          }),
           data: expect.objectContaining({
             status: InquiryStatus.ACCEPTED,
             respondedAt: expect.any(Date),
@@ -203,11 +203,11 @@ describe('Phase 8B Inquiry State Machine Test Suite', () => {
       // Verify atomic compare-and-swap update query
       expect(updateManySpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
+          where: expect.objectContaining({
             id: mockInquiryId,
             creatorId: mockCreatorUserA.id,
             status: InquiryStatus.PENDING,
-          },
+          }),
           data: expect.objectContaining({
             status: InquiryStatus.REJECTED,
             respondedAt: expect.any(Date),

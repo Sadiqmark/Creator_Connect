@@ -9,6 +9,7 @@ import {
   BusinessPrivateProfile,
 } from '../../services/api/businesses';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Building2,
   LogOut,
@@ -85,6 +86,8 @@ export const BusinessDashboard: React.FC = () => {
               <Send className="w-3.5 h-3.5" />
               Inquiries
             </Link>
+
+            <HeaderNotificationDropdown />
 
             <Link
               to="/business/profile"

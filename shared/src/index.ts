@@ -43,3 +43,30 @@ export const InquiryStatus = {
 } as const;
 
 export type InquiryStatus = (typeof InquiryStatus)[keyof typeof InquiryStatus];
+
+export const NotificationType = {
+  INQUIRY_RECEIVED: 'INQUIRY_RECEIVED',
+  INQUIRY_ACCEPTED: 'INQUIRY_ACCEPTED',
+  INQUIRY_REJECTED: 'INQUIRY_REJECTED',
+  INQUIRY_EXPIRED: 'INQUIRY_EXPIRED',
+  COLLABORATION_EMAIL_UPDATED: 'COLLABORATION_EMAIL_UPDATED',
+} as const;
+
+export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
+
+export interface NotificationDTO {
+  id: string;
+  type: NotificationType;
+  referenceId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsListDTO {
+  notifications: NotificationDTO[];
+  unreadCount: number;
+}
+
+export interface MarkAllReadResultDTO {
+  updatedCount: number;
+}

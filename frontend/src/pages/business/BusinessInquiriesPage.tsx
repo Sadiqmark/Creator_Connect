@@ -7,6 +7,7 @@ import {
   BusinessInquiryListItem,
 } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Send,
   Search,
@@ -112,6 +113,7 @@ export const BusinessInquiriesPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <HeaderNotificationDropdown />
             <Link
               to="/creators"
               className="px-4 py-2 bg-foreground text-surface rounded-xl text-xs font-semibold hover:bg-foreground/90 transition-colors shadow-subtle flex items-center gap-1.5"

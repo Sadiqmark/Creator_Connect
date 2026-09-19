@@ -15,15 +15,16 @@ export const createApp = (): Express => {
   app.use(helmet());
 
   // CORS Configuration
-  app.use(
-    cors({
-      origin: env.CORS_ORIGIN,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
-      exposedHeaders: ['X-Request-Id'],
-    })
-  );
+  const corsOptions: cors.CorsOptions = {
+    origin: env.CORS_ORIGIN,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    exposedHeaders: ['X-Request-Id'],
+  };
+
+  app.use(cors(corsOptions));
+  app.options('*', cors(corsOptions));
 
   // Body Parsing
   app.use(express.json({ limit: '1mb' }));

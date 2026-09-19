@@ -5,6 +5,7 @@ import { creatorRouter } from './creator.router';
 import { businessRouter } from './business.router';
 import { savedCreatorRouter } from './savedCreator.router';
 import inquiryRouter from './inquiry.router';
+import { notificationRouter } from './notification.router';
 
 export const apiRouter = Router();
 
@@ -14,4 +15,4 @@ apiRouter.use('/creators', creatorRouter);
 apiRouter.use('/businesses', businessRouter);
 apiRouter.use('/saved-creators', savedCreatorRouter);
 apiRouter.use('/inquiries', inquiryRouter);
-
+apiRouter.use('/notifications', notificationRouter);

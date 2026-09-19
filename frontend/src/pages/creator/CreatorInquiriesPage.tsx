@@ -7,6 +7,7 @@ import {
   CreatorInquiryListItem,
 } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Inbox,
   Clock,
@@ -108,6 +109,10 @@ export const CreatorInquiriesPage: React.FC = () => {
             <p className="text-xs text-foreground-muted mt-1">
               Review and manage brand collaboration proposals.
             </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <HeaderNotificationDropdown />
           </div>
         </header>
 

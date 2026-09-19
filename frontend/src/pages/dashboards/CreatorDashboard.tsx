@@ -8,6 +8,7 @@ import {
   CreatorPrivateProfile,
 } from '../../services/api/creators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Sparkles,
   LogOut,
@@ -78,6 +79,8 @@ export const CreatorDashboard: React.FC = () => {
             >
               Explore Creators
             </Link>
+
+            <HeaderNotificationDropdown />
 
             <Link
               to="/creator/profile"
