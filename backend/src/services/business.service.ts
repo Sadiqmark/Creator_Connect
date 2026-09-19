@@ -182,11 +182,31 @@ export async function upsertBusinessProfile(
 export async function getPublicBusinessProfileById(businessProfileId: string): Promise<BusinessPublicDTO | null> {
   const profile = await prisma.businessProfile.findUnique({
     where: { id: businessProfileId },
-    select: PUBLIC_BUSINESS_SELECT,
+    select: {
+      ...PUBLIC_BUSINESS_SELECT,
+      user: {
+        select: { status: true },
+      },
+    },
   });
 
   if (!profile) return null;
-  return profile;
+  if (profile.user && profile.user.status !== 'ACTIVE') return null;
+
+  return {
+    id: profile.id,
+    businessName: profile.businessName,
+    category: profile.category,
+    description: profile.description,
+    city: profile.city,
+    stateOrProvince: profile.stateOrProvince,
+    country: profile.country,
+    logoUrl: profile.logoUrl,
+    websiteUrl: profile.websiteUrl,
+    instagramUrl: profile.instagramUrl,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
 }
 
 /**

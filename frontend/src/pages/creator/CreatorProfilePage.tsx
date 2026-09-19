@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import {
   getMyCreatorProfile,
@@ -35,6 +36,7 @@ const POPULAR_NICHES = [
 
 export const CreatorProfilePage: React.FC = () => {
   const { appUser } = useAuth();
+  const queryClient = useQueryClient();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -149,11 +151,19 @@ export const CreatorProfilePage: React.FC = () => {
         instagramUrl: formData.instagramUrl.trim() || null,
         youtubeUrl: formData.youtubeUrl.trim() || null,
         collaborationEmail: formData.collaborationEmail.trim(),
-        profilePhotoUrl: formData.profilePhotoUrl || null,
+        profilePhotoUrl: formData.profilePhotoUrl ? formData.profilePhotoUrl.trim() : undefined,
       });
 
       setProfile(updated);
       setSaveSuccess(true);
+
+      // Invalidate concrete dependent queries
+      queryClient.invalidateQueries({ queryKey: ['creators'] });
+      if (updated.id) {
+        queryClient.invalidateQueries({ queryKey: ['creator', updated.id] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] });
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setSaveError(err.message || 'Failed to update profile.');

@@ -341,6 +341,8 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
         expect(screen.getByText('Edit Creator Profile')).toBeInTheDocument();
       });
 
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
       // Click Save Changes
       const saveBtn = screen.getByRole('button', { name: /Save Changes/i });
       saveBtn.click();
@@ -351,6 +353,9 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
             profilePhotoUrl: 'https://images.example.com/elena.jpg',
           })
         );
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['creators'] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['creator', 'cp-001'] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['creator-dashboard'] });
       });
     });
   });
@@ -394,6 +399,61 @@ describe('Phase 4B Frontend Profiles & Public Views Test Suite', () => {
 
       expect(screen.getByDisplayValue('Lumina Activewear')).toBeInTheDocument();
       expect(screen.getByDisplayValue('biz-private@lumina.com')).toBeInTheDocument();
+    });
+
+    it('saves business profile and invalidates business-profile-me, business-dashboard, and business query caches', async () => {
+      const mockBusinessPrivate: businessesApi.BusinessPrivateProfile = {
+        id: 'bp-001',
+        userId: 'u-biz',
+        businessName: 'Lumina Activewear',
+        category: 'Fitness & Wellness',
+        description: 'Sustainable activewear brand overview with sufficient length.',
+        city: 'Denver',
+        stateOrProvince: 'CO',
+        country: 'USA',
+        collaborationEmail: 'biz-private@lumina.com',
+        logoUrl: null,
+        websiteUrl: 'https://lumina.com',
+        instagramUrl: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      vi.mocked(businessesApi.getMyBusinessProfile).mockResolvedValue(mockBusinessPrivate);
+      vi.mocked(businessesApi.updateMyBusinessProfile).mockResolvedValue(mockBusinessPrivate);
+
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      const { BusinessProfilePage } = await import('../pages/business/BusinessProfilePage');
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/business/profile']}>
+            <AuthProvider>
+              <BusinessProfilePage />
+            </AuthProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Business Profile')).toBeInTheDocument();
+      });
+
+      const saveBtn = screen.getByRole('button', { name: /Save Changes/i });
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(businessesApi.updateMyBusinessProfile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            businessName: 'Lumina Activewear',
+            collaborationEmail: 'biz-private@lumina.com',
+          })
+        );
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['business-profile-me'] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['business-dashboard'] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['business', 'bp-001'] });
+      });
     });
   });
 

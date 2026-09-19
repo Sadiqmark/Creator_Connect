@@ -162,7 +162,61 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
       expect(res.body.profile.collaborationEmail).toBe('collab@example.com');
     });
 
-    it('should compute isDiscoverable=false when profilePhotoUrl is null', async () => {
+    it('should reject profile upsert if profilePhotoUrl is explicitly null with 422 VALIDATION_ERROR', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      const res = await request(app)
+        .patch('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          name: 'Sarah Connor',
+          niche: 'Fitness',
+          location: 'Los Angeles, CA',
+          bio: 'Fitness and lifestyle creator.',
+          specialties: ['Fitness', 'Nutrition'],
+          instagramUrl: 'https://instagram.com/sarahconnor',
+          collaborationEmail: 'collab@example.com',
+          profilePhotoUrl: null,
+        });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should reject profile upsert if collaborationEmail is explicitly null with 422 VALIDATION_ERROR', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      const res = await request(app)
+        .patch('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          name: 'Sarah Connor',
+          niche: 'Fitness',
+          location: 'Los Angeles, CA',
+          bio: 'Fitness and lifestyle creator.',
+          specialties: ['Fitness', 'Nutrition'],
+          instagramUrl: 'https://instagram.com/sarahconnor',
+          collaborationEmail: null,
+          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should successfully upsert a valid Instagram-only profile with isDiscoverable=true', async () => {
       verifyIdTokenSpy.mockResolvedValue({
         uid: mockCreatorUser.firebaseUid,
         email: mockCreatorUser.email,
@@ -182,52 +236,6 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         instagramUrl: 'https://instagram.com/sarahconnor',
         youtubeUrl: null,
         collaborationEmail: 'collab@example.com',
-        profilePhotoUrl: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      jest.spyOn(prisma.creatorProfile, 'upsert').mockResolvedValue(upsertedRecord as any);
-
-      const res = await request(app)
-        .patch('/api/v1/creators/me')
-        .set('Authorization', 'Bearer valid-token')
-        .send({
-          name: 'Sarah Connor',
-          niche: 'Fitness',
-          location: 'Los Angeles, CA',
-          bio: 'Fitness and lifestyle creator.',
-          specialties: ['Fitness', 'Nutrition'],
-          instagramUrl: 'https://instagram.com/sarahconnor',
-          collaborationEmail: 'collab@example.com',
-          profilePhotoUrl: null,
-        });
-
-      expect(res.status).toBe(200);
-      expect(res.body.profile.isDiscoverable).toBe(false);
-      expect(res.body.profile.profilePhotoUrl).toBeNull();
-    });
-
-    it('should compute isDiscoverable=false when collaborationEmail is null', async () => {
-      verifyIdTokenSpy.mockResolvedValue({
-        uid: mockCreatorUser.firebaseUid,
-        email: mockCreatorUser.email,
-        email_verified: true,
-      } as any);
-
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
-
-      const upsertedRecord = {
-        id: 'cp-001',
-        userId: mockCreatorUser.id,
-        name: 'Sarah Connor',
-        niche: 'Fitness',
-        location: 'Los Angeles, CA',
-        bio: 'Fitness and lifestyle creator.',
-        specialties: ['Fitness', 'Nutrition'],
-        instagramUrl: 'https://instagram.com/sarahconnor',
-        youtubeUrl: null,
-        collaborationEmail: null,
         profilePhotoUrl: 'https://images.unsplash.com/photo-1',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -245,13 +253,97 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           bio: 'Fitness and lifestyle creator.',
           specialties: ['Fitness', 'Nutrition'],
           instagramUrl: 'https://instagram.com/sarahconnor',
-          collaborationEmail: null,
+          youtubeUrl: null,
+          collaborationEmail: 'collab@example.com',
           profilePhotoUrl: 'https://images.unsplash.com/photo-1',
         });
 
       expect(res.status).toBe(200);
+      expect(res.body.profile.isDiscoverable).toBe(true);
+      expect(res.body.profile.instagramUrl).toBe('https://instagram.com/sarahconnor');
+      expect(res.body.profile.youtubeUrl).toBeNull();
+    });
+
+    it('should successfully upsert a valid YouTube-only profile with isDiscoverable=true', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      const upsertedRecord = {
+        id: 'cp-001',
+        userId: mockCreatorUser.id,
+        name: 'Sarah Connor',
+        niche: 'Fitness',
+        location: 'Los Angeles, CA',
+        bio: 'Fitness and lifestyle creator.',
+        specialties: ['Fitness', 'Nutrition'],
+        instagramUrl: null,
+        youtubeUrl: 'https://youtube.com/@sarahconnor',
+        collaborationEmail: 'collab@example.com',
+        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      jest.spyOn(prisma.creatorProfile, 'upsert').mockResolvedValue(upsertedRecord as any);
+
+      const res = await request(app)
+        .patch('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          name: 'Sarah Connor',
+          niche: 'Fitness',
+          location: 'Los Angeles, CA',
+          bio: 'Fitness and lifestyle creator.',
+          specialties: ['Fitness', 'Nutrition'],
+          instagramUrl: null,
+          youtubeUrl: 'https://youtube.com/@sarahconnor',
+          collaborationEmail: 'collab@example.com',
+          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.profile.isDiscoverable).toBe(true);
+      expect(res.body.profile.instagramUrl).toBeNull();
+      expect(res.body.profile.youtubeUrl).toBe('https://youtube.com/@sarahconnor');
+    });
+
+    it('should compute isDiscoverable=false when private profile in database has missing photo', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUser.firebaseUid,
+        email: mockCreatorUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUser as any);
+
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue({
+        id: 'cp-001',
+        userId: mockCreatorUser.id,
+        name: 'Sarah Connor',
+        niche: 'Fitness',
+        location: 'Los Angeles, CA',
+        bio: 'Fitness bio.',
+        specialties: ['Fitness'],
+        instagramUrl: 'https://instagram.com/sarahconnor',
+        youtubeUrl: null,
+        collaborationEmail: 'collab@example.com',
+        profilePhotoUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+
+      const res = await request(app)
+        .get('/api/v1/creators/me')
+        .set('Authorization', 'Bearer valid-token');
+
+      expect(res.status).toBe(200);
       expect(res.body.profile.isDiscoverable).toBe(false);
-      expect(res.body.profile.collaborationEmail).toBeNull();
+      expect(res.body.profile.profilePhotoUrl).toBeNull();
     });
 
     it('should allow partial PATCH of existing profile while preserving discoverability', async () => {
@@ -359,7 +451,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
       expect(res.body.profile).not.toHaveProperty('collaborationEmail');
     });
 
-    it('should strictly EXCLUDE internal userId, firebaseUid, User.email, and collaborationEmail in public GET /api/v1/businesses/:businessId', async () => {
+    it('should return 200 for ACTIVE business and strictly EXCLUDE internal userId, firebaseUid, User.email, and collaborationEmail in public GET /api/v1/businesses/:businessId', async () => {
       const findUniqueSpy = jest.spyOn(prisma.businessProfile, 'findUnique').mockResolvedValue({
         id: 'bp-001',
         businessName: 'Acme Corp',
@@ -371,6 +463,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         logoUrl: null,
         websiteUrl: 'https://acme.com',
         instagramUrl: null,
+        user: { status: AccountStatus.ACTIVE },
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
@@ -398,6 +491,78 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           }),
         })
       );
+    });
+
+    it('should return 404 BUSINESS_NOT_FOUND when accessing public profile of DELETED business', async () => {
+      jest.spyOn(prisma.businessProfile, 'findUnique').mockResolvedValue({
+        id: 'bp-deleted-001',
+        businessName: 'Defunct Brand',
+        category: 'Retail',
+        description: 'No longer operating.',
+        city: 'Austin',
+        stateOrProvince: 'TX',
+        country: 'USA',
+        logoUrl: null,
+        websiteUrl: null,
+        instagramUrl: null,
+        user: { status: AccountStatus.DELETED },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+
+      const res = await request(app).get('/api/v1/businesses/bp-deleted-001');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('BUSINESS_NOT_FOUND');
+    });
+
+    it('should ensure unrelated active business remains accessible when another business is deleted', async () => {
+      (jest.spyOn(prisma.businessProfile, 'findUnique') as any).mockImplementation(async ({ where }: any) => {
+        if (where.id === 'bp-deleted') {
+          return {
+            id: 'bp-deleted',
+            businessName: 'Closed Brand',
+            category: 'Retail',
+            description: 'Closed.',
+            city: 'New York',
+            stateOrProvince: 'NY',
+            country: 'USA',
+            logoUrl: null,
+            websiteUrl: null,
+            instagramUrl: null,
+            user: { status: AccountStatus.DELETED },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as any;
+        }
+        if (where.id === 'bp-active-unrelated') {
+          return {
+            id: 'bp-active-unrelated',
+            businessName: 'Thriving Brand',
+            category: 'Fashion & Apparel',
+            description: 'Active brand.',
+            city: 'London',
+            stateOrProvince: 'Greater London',
+            country: 'UK',
+            logoUrl: null,
+            websiteUrl: 'https://thriving.com',
+            instagramUrl: null,
+            user: { status: AccountStatus.ACTIVE },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as any;
+        }
+        return null;
+      });
+
+      const deletedRes = await request(app).get('/api/v1/businesses/bp-deleted');
+      expect(deletedRes.status).toBe(404);
+      expect(deletedRes.body.error.code).toBe('BUSINESS_NOT_FOUND');
+
+      const activeRes = await request(app).get('/api/v1/businesses/bp-active-unrelated');
+      expect(activeRes.status).toBe(200);
+      expect(activeRes.body.profile.businessName).toBe('Thriving Brand');
+      expect(activeRes.body.profile.collaborationEmail).toBeUndefined();
     });
 
     it('should include collaborationEmail in private GET /api/v1/businesses/me', async () => {

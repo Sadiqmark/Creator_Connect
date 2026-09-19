@@ -34,9 +34,8 @@ const updateCreatorProfileSchema = z.object({
     .trim()
     .email('A valid email address is required')
     .max(255)
-    .nullable()
     .optional(),
-  profilePhotoUrl: z.string().trim().url().max(500).nullable().optional(),
+  profilePhotoUrl: z.string().trim().url('Enter a valid profile photo URL').max(500).optional(),
 });
 
 // ─── Controller functions ────────────────────────────────────────────────────

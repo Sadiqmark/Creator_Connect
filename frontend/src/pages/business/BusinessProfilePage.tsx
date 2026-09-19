@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import {
   getMyBusinessProfile,
@@ -42,6 +43,7 @@ const BUSINESS_CATEGORIES = [
 
 export const BusinessProfilePage: React.FC = () => {
   const { appUser } = useAuth();
+  const queryClient = useQueryClient();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -162,6 +164,14 @@ export const BusinessProfilePage: React.FC = () => {
 
       setProfile(updated);
       setSaveSuccess(true);
+
+      // Invalidate concrete dependent queries
+      queryClient.invalidateQueries({ queryKey: ['business-profile-me'] });
+      queryClient.invalidateQueries({ queryKey: ['business-dashboard'] });
+      if (updated.id) {
+        queryClient.invalidateQueries({ queryKey: ['business', updated.id] });
+      }
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setSaveError(err.message || 'Failed to update business profile.');
