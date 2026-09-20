@@ -30,6 +30,7 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export const AccountStatus = {
   ACTIVE: 'ACTIVE',
   DELETED: 'DELETED',
+  DEACTIVATED: 'DEACTIVATED',
 } as const;
 
 export type AccountStatus = (typeof AccountStatus)[keyof typeof AccountStatus];

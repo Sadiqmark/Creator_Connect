@@ -107,6 +107,25 @@ export const authMiddleware = async (
       return;
     }
 
+    if (user.status === 'DEACTIVATED') {
+      const fullPath = (req.baseUrl ? req.baseUrl + req.path : req.path).replace(/\/+$/, '');
+      const rawOriginal = (req.originalUrl || '').split('?')[0].replace(/\/+$/, '');
+
+      const isAuthMe = req.method === 'GET' && (fullPath.endsWith('/auth/me') || rawOriginal.endsWith('/auth/me'));
+      const isAuthReactivate = req.method === 'POST' && (fullPath.endsWith('/auth/reactivate') || rawOriginal.endsWith('/auth/reactivate'));
+
+      if (!isAuthMe && !isAuthReactivate) {
+        res.status(403).json({
+          error: {
+            code: 'ACCOUNT_DEACTIVATED',
+            message: 'This account is deactivated. You may reactivate within the 30-day grace period.',
+            requestId: req.id ? String(req.id) : undefined,
+          },
+        });
+        return;
+      }
+    }
+
     req.user = {
       id: user.id,
       firebaseUid: user.firebaseUid,
