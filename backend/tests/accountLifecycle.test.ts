@@ -3,6 +3,7 @@ import { app } from '../src/app';
 import { firebaseAdminAuth } from '../src/config/firebase';
 import prisma from '../src/database/prisma';
 import { UserRole, AccountStatus } from '@prisma/client';
+import { permanentlyDeleteUser } from '../src/services/deletion.service';
 
 describe('Phase 13B-2 Account Lifecycle (Deactivation & Reactivation) Test Suite', () => {
   let verifyIdTokenSpy: jest.SpyInstance;
@@ -101,6 +102,8 @@ describe('Phase 13B-2 Account Lifecycle (Deactivation & Reactivation) Test Suite
   });
 
   afterAll(async () => {
+    await prisma.pendingFirebaseDeletion.deleteMany();
+    await prisma.emailReservation.deleteMany();
     await prisma.auditEvent.deleteMany({
       where: {
         actorUserId: { in: [testCreatorId, testBusinessId, testDeletedUserId, testExpiredDeactivatedId] },
@@ -475,6 +478,136 @@ describe('Phase 13B-2 Account Lifecycle (Deactivation & Reactivation) Test Suite
         },
       });
       expect(auditCount).toBe(1);
+    });
+
+    it('should prevent split-brain state under concurrent permanent deletion vs reactivation race', async () => {
+      // Setup: business user is DEACTIVATED and reached their deletion deadline
+      const now = new Date();
+      await prisma.user.update({
+        where: { id: testBusinessId },
+        data: {
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: new Date(now.getTime() - 1000),
+        },
+      });
+
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb_business_lifecycle',
+        email: 'biz_lifecycle@example.com',
+        email_verified: true,
+      });
+
+      // Fire both permanentlyDeleteUser and reactivateAccount concurrently
+      const [deletionResult, reactivateRes] = await Promise.all([
+        permanentlyDeleteUser(testBusinessId),
+        request(app).post('/api/v1/auth/reactivate').set('Authorization', 'Bearer valid_token'),
+      ]);
+
+      // Check final state in PostgreSQL
+      const finalUser = await prisma.user.findUnique({
+        where: { id: testBusinessId },
+        select: { status: true },
+      });
+
+      // Exactly one outcome must win:
+      if (deletionResult.deleted) {
+        // Case A: Deletion committed first -> Reactivation is blocked (cannot reactivate tombstoned/deleted user)
+        expect([401, 403]).toContain(reactivateRes.status);
+        expect(finalUser?.status).toBe(AccountStatus.DELETED);
+      } else {
+        // Case B: Reactivation committed first -> Reactivation succeeded and deletion was prevented
+        expect(reactivateRes.status).toBe(200);
+        expect(finalUser?.status).toBe(AccountStatus.ACTIVE);
+      }
+
+      // Invariant: status is strictly one of the valid terminal states, never inconsistent
+      expect(['ACTIVE', 'DELETED']).toContain(finalUser?.status);
+    });
+
+    it('Case A: should fail reactivation with 403 ACCOUNT_DELETED when permanent deletion commits first', async () => {
+      const now = new Date();
+      const testUserCaseA = 'd1000000-0000-4000-8000-000000000001';
+
+      await prisma.user.update({
+        where: { id: testUserCaseA },
+        data: {
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: new Date(now.getTime() - 1000),
+        },
+      });
+
+      // Permanent deletion executes first
+      const deletionResult = await permanentlyDeleteUser(testUserCaseA);
+      expect(deletionResult.deleted).toBe(true);
+
+      // Verify that token mapped to the tombstoned user returns 403 ACCOUNT_DELETED
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: `deleted_${testUserCaseA}`,
+        email: `deleted_${testUserCaseA}@deleted.creatorconnect.internal`,
+        email_verified: true,
+      });
+
+      const res = await request(app)
+        .post('/api/v1/auth/reactivate')
+        .set('Authorization', 'Bearer valid_token');
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('ACCOUNT_DELETED');
+
+      // Also verify that the old original UID is unprovisioned (cannot access account)
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb_creator_lifecycle',
+        email: 'creator_lifecycle@example.com',
+        email_verified: true,
+      });
+
+      const resOriginal = await request(app)
+        .post('/api/v1/auth/reactivate')
+        .set('Authorization', 'Bearer valid_token');
+
+      expect(resOriginal.status).toBe(401);
+      expect(resOriginal.body.error.code).toBe('USER_NOT_PROVISIONED');
+    });
+
+    it('Case B: should prevent permanent deletion when reactivation commits first', async () => {
+      const now = new Date();
+      // Use testExpiredDeactivatedId reset to DEACTIVATED within grace period
+      const testUserCaseB = testExpiredDeactivatedId;
+
+      await prisma.user.update({
+        where: { id: testUserCaseB },
+        data: {
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000), // within grace period
+        },
+      });
+
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb_expired_deactivated',
+        email: 'expired_deactivated@example.com',
+        email_verified: true,
+      });
+
+      // Reactivation executes first
+      const res = await request(app)
+        .post('/api/v1/auth/reactivate')
+        .set('Authorization', 'Bearer valid_token');
+
+      expect(res.status).toBe(200);
+
+      // Now attempt permanent deletion on the reactivated user -> must return deleted: false
+      const deletionResult = await permanentlyDeleteUser(testUserCaseB);
+      expect(deletionResult.deleted).toBe(false);
+
+      // Verify user remains ACTIVE in database
+      const userAfter = await prisma.user.findUnique({
+        where: { id: testUserCaseB },
+        select: { status: true },
+      });
+      expect(userAfter?.status).toBe(AccountStatus.ACTIVE);
     });
   });
 });

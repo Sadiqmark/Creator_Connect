@@ -1,5 +1,5 @@
 import prisma from '../src/database/prisma';
-import { UserRole, AccountStatus, InquiryStatus } from '@prisma/client';
+import { UserRole, AccountStatus, InquiryStatus, AuditEventType } from '@prisma/client';
 import {
   hashEmailForReservation,
   permanentlyDeleteUser,
@@ -19,8 +19,20 @@ describe('Phase 13B-3 Permanent Deletion & Unified Lifecycle Runner Test Suite',
   const testBusinessFbUid = 'fb_biz_perm_del_1';
   const testBusinessEmail = 'business.permanent.del@example.com';
 
+  const testBusinessId2 = 'b3000000-0000-4000-8000-000000000002';
+  const testCreatorId2 = 'c3000000-0000-4000-8000-000000000002';
+
   const testActiveUserId = 'a3000000-0000-4000-8000-000000000001';
   const testGraceUserId = 'a3000000-0000-4000-8000-000000000002';
+
+  const allTestUserIds = [
+    testCreatorId,
+    testCreatorId2,
+    testBusinessId,
+    testBusinessId2,
+    testActiveUserId,
+    testGraceUserId,
+  ];
 
   beforeEach(async () => {
     // Clean up test data
@@ -28,28 +40,28 @@ describe('Phase 13B-3 Permanent Deletion & Unified Lifecycle Runner Test Suite',
     await prisma.emailReservation.deleteMany();
     await prisma.auditEvent.deleteMany({
       where: {
-        resourceType: 'USER',
-        resourceId: {
-          in: [testCreatorId, testBusinessId, testActiveUserId, testGraceUserId],
-        },
+        OR: [
+          { resourceType: 'USER', resourceId: { in: allTestUserIds } },
+          { resourceType: 'INQUIRY' },
+        ],
       },
     });
     await prisma.inquiry.deleteMany({
       where: {
         OR: [
-          { creatorId: { in: [testCreatorId, testBusinessId, testActiveUserId, testGraceUserId] } },
-          { businessId: { in: [testCreatorId, testBusinessId, testActiveUserId, testGraceUserId] } },
+          { creatorId: { in: allTestUserIds } },
+          { businessId: { in: allTestUserIds } },
         ],
       },
     });
     await prisma.creatorProfile.deleteMany({
-      where: { userId: { in: [testCreatorId, testBusinessId, testActiveUserId, testGraceUserId] } },
+      where: { userId: { in: allTestUserIds } },
     });
     await prisma.businessProfile.deleteMany({
-      where: { userId: { in: [testCreatorId, testBusinessId, testActiveUserId, testGraceUserId] } },
+      where: { userId: { in: allTestUserIds } },
     });
     await prisma.user.deleteMany({
-      where: { id: { in: [testCreatorId, testBusinessId, testActiveUserId, testGraceUserId] } },
+      where: { id: { in: allTestUserIds } },
     });
   });
 
@@ -232,10 +244,497 @@ describe('Phase 13B-3 Permanent Deletion & Unified Lifecycle Runner Test Suite',
       expect(bizProfile?.city).toBe('');
       expect(bizProfile?.logoUrl).toBeNull();
 
-      // Verify Inquiry remains valid in database (historical integrity preserved)
+      // Verify Inquiry remains valid in database (historical integrity preserved) and is transitioned to CLOSED
       const inquiryAfter = await prisma.inquiry.findUnique({ where: { id: inquiry.id } });
       expect(inquiryAfter).not.toBeNull();
       expect(inquiryAfter?.businessId).toBe(testBusinessId);
+      expect(inquiryAfter?.status).toBe(InquiryStatus.CLOSED);
+      expect(inquiryAfter?.closedAt).not.toBeNull();
+    });
+
+    it('should transition PENDING and ACCEPTED inquiries to CLOSED on permanent deletion of a Creator, leave REJECTED and EXPIRED unchanged, populate closedAt, and emit INQUIRY_CLOSED audit events', async () => {
+      const now = new Date();
+      const pastDeadline = new Date(now.getTime() - 1000);
+
+      // Seed expired DEACTIVATED creator
+      await prisma.user.create({
+        data: {
+          id: testCreatorId,
+          firebaseUid: testCreatorFbUid,
+          email: testCreatorEmail,
+          role: UserRole.CREATOR,
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: pastDeadline,
+          creatorProfile: {
+            create: {
+              name: 'Creator To Be Deleted',
+              niche: 'Lifestyle',
+              location: 'Mumbai',
+              bio: 'Bio',
+            },
+          },
+        },
+      });
+
+      // Seed active partner business 1
+      await prisma.user.create({
+        data: {
+          id: testBusinessId,
+          firebaseUid: testBusinessFbUid,
+          email: testBusinessEmail,
+          role: UserRole.BUSINESS,
+          status: AccountStatus.ACTIVE,
+          businessProfile: {
+            create: {
+              businessName: 'Partner Brand 1',
+              category: 'Lifestyle',
+              description: 'Brand description 1',
+              city: 'Mumbai',
+              stateOrProvince: 'MH',
+              country: 'India',
+            },
+          },
+        },
+      });
+
+      // Seed active partner business 2
+      await prisma.user.create({
+        data: {
+          id: testBusinessId2,
+          firebaseUid: 'fb_biz_perm_del_2',
+          email: 'business2.permanent.del@example.com',
+          role: UserRole.BUSINESS,
+          status: AccountStatus.ACTIVE,
+          businessProfile: {
+            create: {
+              businessName: 'Partner Brand 2',
+              category: 'Tech',
+              description: 'Brand description 2',
+              city: 'Bengaluru',
+              stateOrProvince: 'KA',
+              country: 'India',
+            },
+          },
+        },
+      });
+
+      // Seed 4 inquiries: PENDING, ACCEPTED, REJECTED, EXPIRED
+      // Note: inqPending is with Business 1, inqAccepted is with Business 2 (honoring active inquiry partial unique index)
+      const inqPending = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.PENDING,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'INSTAGRAM',
+          deliverables: 'Post 1',
+          brief: 'Brief for pending',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      const inqAccepted = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId2,
+          creatorId: testCreatorId,
+          status: InquiryStatus.ACCEPTED,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'YOUTUBE',
+          deliverables: 'Video 1',
+          brief: 'Brief for accepted',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          respondedAt: now,
+        },
+      });
+
+      const inqRejected = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.REJECTED,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'TIKTOK',
+          deliverables: 'Video 2',
+          brief: 'Brief for rejected',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          respondedAt: now,
+        },
+      });
+
+      const inqExpired = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.EXPIRED,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'INSTAGRAM',
+          deliverables: 'Post 2',
+          brief: 'Brief for expired',
+          expiresAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      // Permanently delete creator
+      const result = await permanentlyDeleteUser(testCreatorId);
+      expect(result.deleted).toBe(true);
+
+      // 1. PENDING -> CLOSED with closedAt set
+      const updatedPending = await prisma.inquiry.findUnique({ where: { id: inqPending.id } });
+      expect(updatedPending?.status).toBe(InquiryStatus.CLOSED);
+      expect(updatedPending?.closedAt).not.toBeNull();
+
+      // 2. ACCEPTED -> CLOSED with closedAt set
+      const updatedAccepted = await prisma.inquiry.findUnique({ where: { id: inqAccepted.id } });
+      expect(updatedAccepted?.status).toBe(InquiryStatus.CLOSED);
+      expect(updatedAccepted?.closedAt).not.toBeNull();
+
+      // 3. REJECTED -> unchanged, closedAt null
+      const updatedRejected = await prisma.inquiry.findUnique({ where: { id: inqRejected.id } });
+      expect(updatedRejected?.status).toBe(InquiryStatus.REJECTED);
+      expect(updatedRejected?.closedAt).toBeNull();
+
+      // 4. EXPIRED -> unchanged, closedAt null
+      const updatedExpired = await prisma.inquiry.findUnique({ where: { id: inqExpired.id } });
+      expect(updatedExpired?.status).toBe(InquiryStatus.EXPIRED);
+      expect(updatedExpired?.closedAt).toBeNull();
+
+      // Verify exactly one INQUIRY_CLOSED audit event for each closed inquiry
+      const auditEvents = await prisma.auditEvent.findMany({
+        where: {
+          eventType: AuditEventType.INQUIRY_CLOSED,
+          resourceId: { in: [inqPending.id, inqAccepted.id, inqRejected.id, inqExpired.id] },
+        },
+      });
+
+      expect(auditEvents).toHaveLength(2);
+      const pendingAudit = auditEvents.find((e) => e.resourceId === inqPending.id);
+      expect(pendingAudit).toBeDefined();
+      expect(pendingAudit?.actorUserId).toBeNull();
+      expect((pendingAudit?.metadata as any)?.previousStatus).toBe('PENDING');
+      expect((pendingAudit?.metadata as any)?.reason).toBe('PARTICIPANT_PERMANENTLY_DELETED');
+      expect((pendingAudit?.metadata as any)?.deletedUserId).toBe(testCreatorId);
+
+      const acceptedAudit = auditEvents.find((e) => e.resourceId === inqAccepted.id);
+      expect(acceptedAudit).toBeDefined();
+      expect(acceptedAudit?.actorUserId).toBeNull();
+      expect((acceptedAudit?.metadata as any)?.previousStatus).toBe('ACCEPTED');
+      expect((acceptedAudit?.metadata as any)?.reason).toBe('PARTICIPANT_PERMANENTLY_DELETED');
+      expect((acceptedAudit?.metadata as any)?.deletedUserId).toBe(testCreatorId);
+
+      // Verify tombstone remains
+      const userAfter = await prisma.user.findUnique({ where: { id: testCreatorId } });
+      expect(userAfter?.status).toBe(AccountStatus.DELETED);
+    });
+
+    it('should transition PENDING and ACCEPTED inquiries to CLOSED on permanent deletion of a Business', async () => {
+      const now = new Date();
+      const pastDeadline = new Date(now.getTime() - 1000);
+
+      // Seed expired DEACTIVATED business
+      await prisma.user.create({
+        data: {
+          id: testBusinessId,
+          firebaseUid: testBusinessFbUid,
+          email: testBusinessEmail,
+          role: UserRole.BUSINESS,
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: pastDeadline,
+          businessProfile: {
+            create: {
+              businessName: 'Business To Be Deleted',
+              category: 'Tech',
+              description: 'Tech business',
+              city: 'Bengaluru',
+              stateOrProvince: 'KA',
+              country: 'India',
+            },
+          },
+        },
+      });
+
+      // Seed active partner creator 1
+      await prisma.user.create({
+        data: {
+          id: testCreatorId,
+          firebaseUid: testCreatorFbUid,
+          email: testCreatorEmail,
+          role: UserRole.CREATOR,
+          status: AccountStatus.ACTIVE,
+          creatorProfile: {
+            create: {
+              name: 'Partner Creator 1',
+              niche: 'Tech',
+              location: 'Bengaluru',
+              bio: 'Bio 1',
+            },
+          },
+        },
+      });
+
+      // Seed active partner creator 2
+      await prisma.user.create({
+        data: {
+          id: testCreatorId2,
+          firebaseUid: 'fb_creator_perm_del_2',
+          email: 'creator2.permanent.del@example.com',
+          role: UserRole.CREATOR,
+          status: AccountStatus.ACTIVE,
+          creatorProfile: {
+            create: {
+              name: 'Partner Creator 2',
+              niche: 'Fashion',
+              location: 'Mumbai',
+              bio: 'Bio 2',
+            },
+          },
+        },
+      });
+
+      const inqPending = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.PENDING,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'YOUTUBE',
+          deliverables: 'Deliverable 1',
+          brief: 'Brief for pending inquiry',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      const inqAccepted = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId2,
+          status: InquiryStatus.ACCEPTED,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'INSTAGRAM',
+          deliverables: 'Deliverable 2',
+          brief: 'Brief for accepted inquiry',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          respondedAt: now,
+        },
+      });
+
+      const result = await permanentlyDeleteUser(testBusinessId);
+      expect(result.deleted).toBe(true);
+
+      const updatedPending = await prisma.inquiry.findUnique({ where: { id: inqPending.id } });
+      expect(updatedPending?.status).toBe(InquiryStatus.CLOSED);
+      expect(updatedPending?.closedAt).not.toBeNull();
+
+      const updatedAccepted = await prisma.inquiry.findUnique({ where: { id: inqAccepted.id } });
+      expect(updatedAccepted?.status).toBe(InquiryStatus.CLOSED);
+      expect(updatedAccepted?.closedAt).not.toBeNull();
+
+      const auditEvents = await prisma.auditEvent.findMany({
+        where: {
+          eventType: AuditEventType.INQUIRY_CLOSED,
+          resourceId: { in: [inqPending.id, inqAccepted.id] },
+        },
+      });
+      expect(auditEvents).toHaveLength(2);
+      for (const audit of auditEvents) {
+        expect((audit.metadata as any)?.deletedUserId).toBe(testBusinessId);
+      }
+    });
+
+    it('should free the unique_active_business_creator_inquiry partial unique index after an ACCEPTED inquiry is transitioned to CLOSED on permanent deletion', async () => {
+      const now = new Date();
+      const pastDeadline = new Date(now.getTime() - 1000);
+
+      // Seed expired DEACTIVATED creator
+      await prisma.user.create({
+        data: {
+          id: testCreatorId,
+          firebaseUid: testCreatorFbUid,
+          email: testCreatorEmail,
+          role: UserRole.CREATOR,
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: pastDeadline,
+          creatorProfile: {
+            create: {
+              name: 'Creator For Index Test',
+              niche: 'Fashion',
+              location: 'Delhi',
+              bio: 'Bio',
+            },
+          },
+        },
+      });
+
+      // Seed active business
+      await prisma.user.create({
+        data: {
+          id: testBusinessId,
+          firebaseUid: testBusinessFbUid,
+          email: testBusinessEmail,
+          role: UserRole.BUSINESS,
+          status: AccountStatus.ACTIVE,
+          businessProfile: {
+            create: {
+              businessName: 'Business For Index Test',
+              category: 'Fashion',
+              description: 'Brand',
+              city: 'Delhi',
+              stateOrProvince: 'DL',
+              country: 'India',
+            },
+          },
+        },
+      });
+
+      // Create an ACCEPTED inquiry between business and creator
+      const inquiry = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.ACCEPTED,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'INSTAGRAM',
+          deliverables: 'Reel',
+          brief: 'Brief',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          respondedAt: now,
+        },
+      });
+
+      // Attempting to create another active (PENDING) inquiry violates the partial unique index
+      await expect(
+        prisma.inquiry.create({
+          data: {
+            businessId: testBusinessId,
+            creatorId: testCreatorId,
+            status: InquiryStatus.PENDING,
+            collaborationType: 'COLLAB',
+            platform: 'YOUTUBE',
+            deliverables: 'Deliverable',
+            brief: 'Second active inquiry brief',
+            expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          },
+        })
+      ).rejects.toThrow();
+
+      // Permanently delete the creator -> transitions existing ACCEPTED inquiry to CLOSED
+      const result = await permanentlyDeleteUser(testCreatorId);
+      expect(result.deleted).toBe(true);
+
+      const inqAfter = await prisma.inquiry.findUnique({ where: { id: inquiry.id } });
+      expect(inqAfter?.status).toBe(InquiryStatus.CLOSED);
+
+      // Now that status is CLOSED, creating another inquiry with status PENDING must SUCCEED!
+      // This proves the PostgreSQL partial unique index ('unique_active_business_creator_inquiry')
+      // is no longer occupied!
+      const newInquiry = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.PENDING,
+          collaborationType: 'COLLAB',
+          platform: 'YOUTUBE',
+          deliverables: 'New deliverable',
+          brief: 'Brief after deletion',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      expect(newInquiry.id).toBeDefined();
+      expect(newInquiry.status).toBe(InquiryStatus.PENDING);
+    });
+
+    it('should not overwrite an inquiry that concurrently transitioned to REJECTED and should not emit an INQUIRY_CLOSED audit event for it', async () => {
+      const now = new Date();
+      const pastDeadline = new Date(now.getTime() - 1000);
+
+      // Seed expired DEACTIVATED creator
+      await prisma.user.create({
+        data: {
+          id: testCreatorId,
+          firebaseUid: testCreatorFbUid,
+          email: testCreatorEmail,
+          role: UserRole.CREATOR,
+          status: AccountStatus.DEACTIVATED,
+          deactivatedAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000),
+          deletionScheduledAt: pastDeadline,
+          creatorProfile: {
+            create: {
+              name: 'Creator Concurrency Race Test',
+              niche: 'Tech',
+              location: 'Bangalore',
+              bio: 'Bio',
+            },
+          },
+        },
+      });
+
+      // Seed active business
+      await prisma.user.create({
+        data: {
+          id: testBusinessId,
+          firebaseUid: testBusinessFbUid,
+          email: testBusinessEmail,
+          role: UserRole.BUSINESS,
+          status: AccountStatus.ACTIVE,
+          businessProfile: {
+            create: {
+              businessName: 'Business Concurrency Test',
+              category: 'Tech',
+              description: 'Brand',
+              city: 'Bangalore',
+              stateOrProvince: 'KA',
+              country: 'India',
+            },
+          },
+        },
+      });
+
+      // Seed an active PENDING inquiry and an already REJECTED inquiry
+      const inqPending = await prisma.inquiry.create({
+        data: {
+          businessId: testBusinessId,
+          creatorId: testCreatorId,
+          status: InquiryStatus.PENDING,
+          collaborationType: 'SPONSORED_POST',
+          platform: 'YOUTUBE',
+          deliverables: 'Video',
+          brief: 'Brief 1',
+          expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      // Concurrently simulate a race:
+      // While inquiry was initially PENDING, another transaction updates it to REJECTED before permanent deletion acquires the inquiry lock.
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT id FROM inquiries WHERE id = ${inqPending.id}::uuid FOR UPDATE
+        `;
+        await tx.inquiry.update({
+          where: { id: inqPending.id },
+          data: { status: InquiryStatus.REJECTED },
+        });
+      });
+
+      // Run permanent deletion
+      const result = await permanentlyDeleteUser(testCreatorId);
+      expect(result.deleted).toBe(true);
+
+      // Verify inquiry remains REJECTED, closedAt remains null
+      const inqAfter = await prisma.inquiry.findUnique({ where: { id: inqPending.id } });
+      expect(inqAfter?.status).toBe(InquiryStatus.REJECTED);
+      expect(inqAfter?.closedAt).toBeNull();
+
+      // Verify NO INQUIRY_CLOSED audit event was emitted for this inquiry
+      const auditEvents = await prisma.auditEvent.findMany({
+        where: {
+          eventType: AuditEventType.INQUIRY_CLOSED,
+          resourceId: inqPending.id,
+        },
+      });
+      expect(auditEvents).toHaveLength(0);
     });
 
     it('should NOT delete an ACTIVE user or a DEACTIVATED user whose grace period has not expired', async () => {

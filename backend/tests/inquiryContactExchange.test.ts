@@ -532,4 +532,155 @@ describe('Phase 11A — Controlled Contact Exchange Integration Test Suite', () 
       expect(rawBody).not.toContain(mockCreatorUserA.email);
     });
   });
+
+  // ─── 9. ACCOUNT DEACTIVATION & REACTIVATION CONTACT WITHHOLDING LIFECYCLE ──
+  describe('9. Account Deactivation & Reactivation Contact Withholding Lifecycle', () => {
+    it('should withhold Creator contact info when Creator becomes DEACTIVATED, and restore upon reactivation', async () => {
+      // 1. Initial State: ACCEPTED inquiry between Business A and Creator A (both ACTIVE)
+      const activeInquiry = {
+        ...baseInquiryRecord,
+        status: InquiryStatus.ACCEPTED,
+        respondedAt: new Date('2026-09-11T09:00:00Z'),
+        creator: {
+          id: mockCreatorUserA.id,
+          status: AccountStatus.ACTIVE,
+          deletedAt: null,
+          creatorProfile: mockCreatorProfileA,
+        },
+      };
+
+      const findUniqueSpy = jest.spyOn(prisma.inquiry, 'findUnique');
+      findUniqueSpy.mockResolvedValue(activeInquiry as any);
+
+      // Step 2: While both are ACTIVE, contact information is returned to Business
+      let res = await request(app)
+        .get(`/api/v1/inquiries/${mockInquiryIdA}`)
+        .set('Authorization', 'Bearer biz-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.inquiry.contact).not.toBeNull();
+      expect(res.body.inquiry.contact.collaborationEmail).toBe('direct-collab@elenarostova.com');
+      expect(res.body.inquiry.contact.instagramUrl).toBe('https://instagram.com/elenarostova');
+
+      // Step 3 & 4: Creator becomes DEACTIVATED
+      const deactivatedCreatorInquiry = {
+        ...baseInquiryRecord,
+        status: InquiryStatus.ACCEPTED,
+        respondedAt: new Date('2026-09-11T09:00:00Z'),
+        creator: {
+          id: mockCreatorUserA.id,
+          status: AccountStatus.DEACTIVATED,
+          deletedAt: null,
+          creatorProfile: mockCreatorProfileA,
+        },
+      };
+      findUniqueSpy.mockResolvedValue(deactivatedCreatorInquiry as any);
+
+      // Step 5: Business requests inquiry detail -> Creator private contact info is WITHHELD (null)
+      res = await request(app)
+        .get(`/api/v1/inquiries/${mockInquiryIdA}`)
+        .set('Authorization', 'Bearer biz-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.inquiry.contact).toBeNull();
+      // Public profile data remains visible for historical context
+      expect(res.body.inquiry.creator.name).toBe('Elena Rostova');
+
+      // Step 6 & 7: Creator REACTIVATES back to ACTIVE
+      const reactivatedCreatorInquiry = {
+        ...baseInquiryRecord,
+        status: InquiryStatus.ACCEPTED,
+        respondedAt: new Date('2026-09-11T09:00:00Z'),
+        creator: {
+          id: mockCreatorUserA.id,
+          status: AccountStatus.ACTIVE,
+          deletedAt: null,
+          creatorProfile: mockCreatorProfileA,
+        },
+      };
+      findUniqueSpy.mockResolvedValue(reactivatedCreatorInquiry as any);
+
+      // Step 8: Business requests inquiry detail -> Contact information becomes AVAILABLE again
+      res = await request(app)
+        .get(`/api/v1/inquiries/${mockInquiryIdA}`)
+        .set('Authorization', 'Bearer biz-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.inquiry.contact).not.toBeNull();
+      expect(res.body.inquiry.contact.collaborationEmail).toBe('direct-collab@elenarostova.com');
+    });
+
+    it('should withhold Business contact info when Business becomes DEACTIVATED, and restore upon reactivation', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockCreatorUserA.firebaseUid,
+        email: mockCreatorUserA.email,
+        email_verified: true,
+      } as any);
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockCreatorUserA as any);
+
+      const findUniqueSpy = jest.spyOn(prisma.inquiry, 'findUnique');
+
+      // 1. Both ACTIVE
+      findUniqueSpy.mockResolvedValue({
+        ...baseInquiryRecord,
+        status: InquiryStatus.ACCEPTED,
+        respondedAt: new Date('2026-09-11T09:00:00Z'),
+        business: {
+          id: mockBusinessUserA.id,
+          status: AccountStatus.ACTIVE,
+          deletedAt: null,
+          businessProfile: mockBusinessProfileA,
+        },
+      } as any);
+
+      let res = await request(app)
+        .get(`/api/v1/creators/me/inquiries/${mockInquiryIdA}`)
+        .set('Authorization', 'Bearer creator-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.inquiry.contact).not.toBeNull();
+      expect(res.body.inquiry.contact.collaborationEmail).toBe('collab-partnerships@luminastudio.com');
+
+      // 2. Business DEACTIVATED -> contact withheld
+      findUniqueSpy.mockResolvedValue({
+        ...baseInquiryRecord,
+        status: InquiryStatus.ACCEPTED,
+        respondedAt: new Date('2026-09-11T09:00:00Z'),
+        business: {
+          id: mockBusinessUserA.id,
+          status: AccountStatus.DEACTIVATED,
+          deletedAt: null,
+          businessProfile: mockBusinessProfileA,
+        },
+      } as any);
+
+      res = await request(app)
+        .get(`/api/v1/creators/me/inquiries/${mockInquiryIdA}`)
+        .set('Authorization', 'Bearer creator-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.inquiry.contact).toBeNull();
+
+      // 3. Business REACTIVATED -> contact restored
+      findUniqueSpy.mockResolvedValue({
+        ...baseInquiryRecord,
+        status: InquiryStatus.ACCEPTED,
+        respondedAt: new Date('2026-09-11T09:00:00Z'),
+        business: {
+          id: mockBusinessUserA.id,
+          status: AccountStatus.ACTIVE,
+          deletedAt: null,
+          businessProfile: mockBusinessProfileA,
+        },
+      } as any);
+
+      res = await request(app)
+        .get(`/api/v1/creators/me/inquiries/${mockInquiryIdA}`)
+        .set('Authorization', 'Bearer creator-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.inquiry.contact).not.toBeNull();
+      expect(res.body.inquiry.contact.collaborationEmail).toBe('collab-partnerships@luminastudio.com');
+    });
+  });
 });

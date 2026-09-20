@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { InquiryStatus, AuditEventType } from '@prisma/client';
 import prisma from '../database/prisma';
 import { env } from '../config/env';
 import { firebaseAdminAuth } from '../config/firebase';
@@ -60,11 +61,12 @@ export type PermanentDeletionResult = {
  * 1. Lock user with FOR UPDATE SKIP LOCKED
  * 2. Acquire transaction-level advisory lock keyed on normalized email
  * 3. Define single transaction timestamp: permanentDeletedAt
- * 4. Anonymize profile data
- * 5. Create deterministic 180-day email reservation with 4-case conflict handling
- * 6. Enqueue original Firebase UID in pending_firebase_deletions
- * 7. Convert User row into minimal tombstone
- * 8. Write ACCOUNT_PERMANENTLY_DELETED audit event
+ * 4. Close active inquiries (PENDING/ACCEPTED -> CLOSED) with closedAt & INQUIRY_CLOSED audit events
+ * 5. Anonymize profile data
+ * 6. Create deterministic 180-day email reservation with 4-case conflict handling
+ * 7. Enqueue original Firebase UID in pending_firebase_deletions
+ * 8. Convert User row into minimal tombstone
+ * 9. Write ACCOUNT_PERMANENTLY_DELETED audit event
  *
  * NOTE: Absolutely NO Firebase network calls are made inside this transaction.
  */
@@ -106,7 +108,51 @@ export async function permanentlyDeleteUser(userId: string): Promise<PermanentDe
     const permanentDeletedAt = new Date();
     const reservedUntil = new Date(permanentDeletedAt.getTime() + 180 * 24 * 60 * 60 * 1000);
 
-    // 3. Anonymize Profile Data
+    // 4. Identify and Close Active Inquiries (PENDING / ACCEPTED -> CLOSED)
+    // Row-level lock (FOR UPDATE) guarantees:
+    // - Any concurrent transaction modifying an inquiry must complete before this query evaluates.
+    // - Under PostgreSQL READ COMMITTED, if a concurrent transaction updated the status to REJECTED/EXPIRED,
+    //   re-evaluation skips that row so it is NOT returned or transitioned.
+    // - Any concurrent transaction attempting to modify an inquiry after this lock is acquired will wait until this transaction commits.
+    const activeInquiries = await tx.$queryRaw<Array<{ id: string; status: InquiryStatus }>>`
+      SELECT id, status
+      FROM inquiries
+      WHERE (business_id = ${userId}::uuid OR creator_id = ${userId}::uuid)
+        AND status IN ('PENDING', 'ACCEPTED')
+      FOR UPDATE
+    `;
+
+    if (activeInquiries.length > 0) {
+      await tx.inquiry.updateMany({
+        where: {
+          id: { in: activeInquiries.map((inq) => inq.id) },
+          status: { in: [InquiryStatus.PENDING, InquiryStatus.ACCEPTED] },
+        },
+        data: {
+          status: InquiryStatus.CLOSED,
+          closedAt: permanentDeletedAt,
+        },
+      });
+
+      for (const inq of activeInquiries) {
+        await tx.auditEvent.create({
+          data: {
+            eventType: AuditEventType.INQUIRY_CLOSED,
+            actorUserId: null,
+            resourceType: 'INQUIRY',
+            resourceId: inq.id,
+            metadata: {
+              previousStatus: inq.status,
+              reason: 'PARTICIPANT_PERMANENTLY_DELETED',
+              deletedUserId: userId,
+            },
+            createdAt: permanentDeletedAt,
+          },
+        });
+      }
+    }
+
+    // 5. Anonymize Profile Data
     if (user.role === 'CREATOR') {
       await tx.creatorProfile.updateMany({
         where: { userId },
@@ -140,7 +186,7 @@ export async function permanentlyDeleteUser(userId: string): Promise<PermanentDe
       });
     }
 
-    // 4. Email Reservation with 4-Case Conflict Discrimination
+    // 6. Email Reservation with 4-Case Conflict Discrimination
     const emailHash = hashEmailForReservation(user.email);
     let reservationOutcome: 'CREATED' | 'REPLACED_EXPIRED' | 'ALREADY_EXISTS_SAME_USER' | 'HISTORICAL_CONFLICT' =
       'CREATED';
@@ -195,7 +241,7 @@ export async function permanentlyDeleteUser(userId: string): Promise<PermanentDe
       }
     }
 
-    // 5. Enqueue Original Firebase UID
+    // 7. Enqueue Original Firebase UID
     const originalFirebaseUid = user.firebase_uid;
     await tx.$executeRaw`
       INSERT INTO pending_firebase_deletions (id, firebase_uid, attempts, created_at)
@@ -203,7 +249,7 @@ export async function permanentlyDeleteUser(userId: string): Promise<PermanentDe
       ON CONFLICT (firebase_uid) DO NOTHING
     `;
 
-    // 6. Convert User Row into Minimal Tombstone
+    // 8. Convert User Row into Minimal Tombstone
     const tombstoneEmail = `deleted_${userId}@deleted.creatorconnect.internal`;
     const tombstoneUid = `deleted_${userId}`;
 
@@ -218,7 +264,7 @@ export async function permanentlyDeleteUser(userId: string): Promise<PermanentDe
       },
     });
 
-    // 7. Write Audit Event
+    // 9. Write Audit Event
     await tx.auditEvent.create({
       data: {
         eventType: 'ACCOUNT_PERMANENTLY_DELETED',

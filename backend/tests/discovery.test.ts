@@ -384,4 +384,60 @@ describe('Phase 6B Creator Discovery & Details Test Suite', () => {
       expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');
     });
   });
+
+  // ─── 4. DISCOVERY & PROFILE LIFECYCLE (DEACTIVATION & REACTIVATION) ────────
+  describe('4. Discovery & Profile Lifecycle (Deactivation & Reactivation)', () => {
+    it('should hide creator from discovery during deactivation and restore upon reactivation', async () => {
+      // 1. ACTIVE creator appears in discovery and direct public profile lookup
+      jest.spyOn(prisma.creatorProfile, 'count').mockResolvedValue(1);
+      jest.spyOn(prisma.creatorProfile, 'findMany').mockResolvedValue([sampleCreatorProfile] as any);
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue(sampleCreatorProfile as any);
+
+      // Discovery search
+      let listRes = await request(app).get('/api/v1/creators');
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.creators).toHaveLength(1);
+      expect(listRes.body.creators[0].id).toBe(sampleCreatorProfile.id);
+
+      // Direct profile lookup
+      let profileRes = await request(app).get(`/api/v1/creators/${sampleCreatorProfile.id}`);
+      expect(profileRes.status).toBe(200);
+      expect(profileRes.body.profile.id).toBe(sampleCreatorProfile.id);
+      expect(profileRes.body.profile.name).toBe(sampleCreatorProfile.name);
+
+      // 2. DEACTIVATE creator -> excluded from discovery and direct profile lookup returns 404
+      // In discovery listing, findMany filters where user: { status: 'ACTIVE' }, returning empty
+      jest.spyOn(prisma.creatorProfile, 'count').mockResolvedValue(0);
+      jest.spyOn(prisma.creatorProfile, 'findMany').mockResolvedValue([] as any);
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue({
+        ...sampleCreatorProfile,
+        user: { status: 'DEACTIVATED' },
+      } as any);
+
+      listRes = await request(app).get('/api/v1/creators');
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.creators).toHaveLength(0);
+
+      profileRes = await request(app).get(`/api/v1/creators/${sampleCreatorProfile.id}`);
+      expect(profileRes.status).toBe(404);
+      expect(profileRes.body.error.code).toBe('CREATOR_NOT_FOUND');
+
+      // 3. REACTIVATE creator -> reappears in discovery and direct profile lookup succeeds with data intact
+      jest.spyOn(prisma.creatorProfile, 'count').mockResolvedValue(1);
+      jest.spyOn(prisma.creatorProfile, 'findMany').mockResolvedValue([sampleCreatorProfile] as any);
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue(sampleCreatorProfile as any);
+
+      listRes = await request(app).get('/api/v1/creators');
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.creators).toHaveLength(1);
+      expect(listRes.body.creators[0].id).toBe(sampleCreatorProfile.id);
+
+      profileRes = await request(app).get(`/api/v1/creators/${sampleCreatorProfile.id}`);
+      expect(profileRes.status).toBe(200);
+      expect(profileRes.body.profile.name).toBe('Elena Rostova');
+      expect(profileRes.body.profile.bio).toBe(sampleCreatorProfile.bio);
+      expect(profileRes.body.profile.niche).toBe(sampleCreatorProfile.niche);
+      expect(profileRes.body.profile.location).toBe(sampleCreatorProfile.location);
+    });
+  });
 });

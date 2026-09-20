@@ -585,4 +585,108 @@ describe('Phase 10B Creator Inquiry Management Test Suite', () => {
       expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
     });
   });
+
+  // ─── 6. LIFECYCLE INQUIRY CREATION RESTRICTIONS (DEACTIVATED CREATOR) ──────
+  describe('6. Lifecycle Inquiry Creation Restrictions (Deactivated Creator)', () => {
+    const creatorProfileId = 'c0000000-0000-4000-8000-000000000001';
+    const sampleCreatorProfile = {
+      id: creatorProfileId,
+      userId: mockCreatorUserA.id,
+      name: 'Elena Rostova',
+      niche: 'Fashion',
+      location: 'Milan, Italy',
+      bio: 'High-fashion visual creator and aesthetic director.',
+      specialties: ['Fashion Styling', 'Photography'],
+      instagramUrl: 'https://instagram.com/elenarostova',
+      youtubeUrl: null,
+      profilePhotoUrl: 'https://storage.googleapis.com/test/photo1.jpg',
+      collaborationEmail: 'elena@agency.com',
+      user: { id: mockCreatorUserA.id, role: UserRole.CREATOR, status: AccountStatus.ACTIVE },
+    };
+
+    const validInquiryPayload = {
+      creatorId: creatorProfileId,
+      collaborationType: 'Sponsored Reel',
+      platform: 'Instagram',
+      deliverables: '1 Dedicated Reel with link in bio',
+      timelineStart: '2026-10-01',
+      timelineEnd: '2026-10-15',
+      brief: 'Detailed brief for upcoming collaboration campaign exceeding twenty chars.',
+      additionalRequirements: 'Provide deliverables within timeline.',
+    };
+
+    it('allows Business to create inquiry when Creator is ACTIVE', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockBusinessUser.firebaseUid,
+        email: mockBusinessUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockBusinessUser as any);
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue(sampleCreatorProfile as any);
+
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          inquiry: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+              id: 'new-inquiry-id',
+              businessId: mockBusinessUser.id,
+              creatorId: mockCreatorUserA.id,
+              status: InquiryStatus.PENDING,
+              collaborationType: validInquiryPayload.collaborationType,
+              platform: validInquiryPayload.platform,
+              deliverables: validInquiryPayload.deliverables,
+              timelineStart: new Date(validInquiryPayload.timelineStart),
+              timelineEnd: new Date(validInquiryPayload.timelineEnd),
+              brief: validInquiryPayload.brief,
+              additionalRequirements: validInquiryPayload.additionalRequirements,
+              createdAt: new Date(),
+              expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+            }),
+          },
+          notification: {
+            create: jest.fn().mockResolvedValue({}),
+          },
+          auditEvent: {
+            create: jest.fn().mockResolvedValue({}),
+          },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer biz-token')
+        .send(validInquiryPayload);
+
+      expect(res.status).toBe(201);
+      expect(res.body.inquiry).toBeDefined();
+      expect(res.body.inquiry.status).toBe(InquiryStatus.PENDING);
+    });
+
+    it('rejects new inquiry with 404 CREATOR_NOT_FOUND when Creator is DEACTIVATED', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: mockBusinessUser.firebaseUid,
+        email: mockBusinessUser.email,
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockBusinessUser as any);
+      // Creator user status is DEACTIVATED
+      jest.spyOn(prisma.creatorProfile, 'findUnique').mockResolvedValue({
+        ...sampleCreatorProfile,
+        user: { id: mockCreatorUserA.id, role: UserRole.CREATOR, status: AccountStatus.DEACTIVATED },
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer biz-token')
+        .send(validInquiryPayload);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('CREATOR_NOT_FOUND');
+      expect(res.body.error.message).toContain('Creator profile not found or unavailable');
+    });
+  });
 });
