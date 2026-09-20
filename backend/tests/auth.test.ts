@@ -702,38 +702,35 @@ describe('Phase 3B Comprehensive Authentication & Security Test Suite', () => {
     const bizEmail = 'biz.delete@example.com';
     const bizUserId = 'b1000000-0000-4000-8000-000000000001';
 
-    it('should soft-delete user, clear collaboration email, cascade active inquiries to CLOSED, and preserve historical records', async () => {
+    it('should delegate /delete-account to account deactivation (deprecated compatibility)', async () => {
       verifyIdTokenSpy.mockResolvedValue({
         uid: bizUid,
         email: bizEmail,
         email_verified: true,
       } as any);
 
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
-        id: bizUserId,
-        firebaseUid: bizUid,
-        email: bizEmail,
-        role: UserRole.BUSINESS,
-        status: AccountStatus.ACTIVE,
-      } as any);
+      let findUniqueCallCount = 0;
+      (jest.spyOn(prisma.user, 'findUnique') as any).mockImplementation(async () => {
+        findUniqueCallCount++;
+        return {
+          id: bizUserId,
+          firebaseUid: bizUid,
+          email: bizEmail,
+          role: UserRole.BUSINESS,
+          status: findUniqueCallCount >= 3 ? AccountStatus.DEACTIVATED : AccountStatus.ACTIVE,
+        };
+      });
 
-      const updateManyInquirySpy = jest.fn().mockResolvedValue({ count: 2 });
-      const updateManyCreatorProfileSpy = jest.fn().mockResolvedValue({ count: 0 });
-      const updateManyBusinessProfileSpy = jest.fn().mockResolvedValue({ count: 1 });
-      const updateUserSpy = jest.fn().mockResolvedValue({});
+      const updateManyUserSpy = jest.fn().mockResolvedValue({ count: 1 });
       const createAuditSpy = jest.fn().mockResolvedValue({});
 
       jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
         return cb({
-          user: { update: updateUserSpy },
-          creatorProfile: { updateMany: updateManyCreatorProfileSpy },
-          businessProfile: { updateMany: updateManyBusinessProfileSpy },
-          inquiry: { updateMany: updateManyInquirySpy },
+          user: { updateMany: updateManyUserSpy },
           auditEvent: { create: createAuditSpy },
         });
       });
 
-      const updateUserFbSpy = jest.spyOn(firebaseAdminAuth, 'updateUser').mockResolvedValue({} as any);
       const revokeTokensFbSpy = jest.spyOn(firebaseAdminAuth, 'revokeRefreshTokens').mockResolvedValue({} as any);
 
       const res = await request(app)
@@ -741,33 +738,28 @@ describe('Phase 3B Comprehensive Authentication & Security Test Suite', () => {
         .set('Authorization', 'Bearer valid-token');
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toContain('successfully deleted');
+      expect(res.body.message).toContain('deactivated');
+      expect(res.body.daysRemaining).toBe(30);
 
       // Verifications:
-      expect(updateUserSpy).toHaveBeenCalledWith(
+      expect(updateManyUserSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: bizUserId },
+          where: { id: bizUserId, status: 'ACTIVE' },
           data: expect.objectContaining({
-            status: 'DELETED',
-            deletedAt: expect.any(Date),
+            status: 'DEACTIVATED',
+            deactivatedAt: expect.any(Date),
+            deletionScheduledAt: expect.any(Date),
           }),
         })
       );
-      expect(updateManyBusinessProfileSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { userId: bizUserId },
-          data: { collaborationEmail: null },
-        })
-      );
-      expect(updateManyInquirySpy).toHaveBeenCalledWith(
+      expect(createAuditSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            status: 'CLOSED',
-            closedAt: expect.any(Date),
+            eventType: 'ACCOUNT_DEACTIVATED',
+            resourceId: bizUserId,
           }),
         })
       );
-      expect(updateUserFbSpy).toHaveBeenCalledWith(bizUid, { disabled: true });
       expect(revokeTokensFbSpy).toHaveBeenCalledWith(bizUid);
     });
 

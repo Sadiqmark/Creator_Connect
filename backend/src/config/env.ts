@@ -19,7 +19,9 @@ const envSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().optional().default('placeholder-project-id'),
   FIREBASE_CLIENT_EMAIL: z.string().optional().default('placeholder@example.com'),
   FIREBASE_PRIVATE_KEY: z.string().optional().default('placeholder-key'),
-
+  EMAIL_RESERVATION_HMAC_SECRET: z
+    .string({ required_error: 'EMAIL_RESERVATION_HMAC_SECRET is required' })
+    .min(32, 'EMAIL_RESERVATION_HMAC_SECRET must be at least 32 characters'),
 });
 
 const parseEnv = () => {

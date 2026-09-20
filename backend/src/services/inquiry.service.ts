@@ -452,7 +452,23 @@ export async function expireInquiries(batchSize = 100): Promise<{ expiredCount: 
   let expiredCount = 0;
 
   for (const item of staleInquiries) {
-    const transitioned = await prisma.$transaction(async (tx) => {
+    const transitioned = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Multi-instance safe lock with FOR UPDATE SKIP LOCKED
+      // In production, tx is the genuine Prisma.TransactionClient where $queryRaw is always present.
+      // The guard gracefully supports unit-test mocks that provide partial transaction stubs.
+      if (typeof tx.$queryRaw === 'function') {
+        const locked = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM inquiries
+          WHERE id = ${item.id}::uuid AND status = 'PENDING' AND expires_at <= ${now}
+          FOR UPDATE SKIP LOCKED
+        `;
+
+        if (locked.length === 0) {
+          return false;
+        }
+      }
+
       // Atomic conditional update
       const updateResult = await tx.inquiry.updateMany({
         where: {

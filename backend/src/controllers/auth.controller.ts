@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { UserRole, InquiryStatus } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import prisma from '../database/prisma';
 import { firebaseAdminAuth } from '../config/firebase';
 import { logger } from '../middleware/logger';
@@ -236,89 +236,15 @@ export const provisionUser = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+/**
+ * @deprecated Legacy endpoint. Delegates to deactivateAccount.
+ * Under Phase 13B 3-tier lifecycle, accounts are deactivated for a 30-day grace period
+ * before permanent deletion is executed by the background lifecycle runner.
+ */
 export const deleteAccount = async (req: Request, res: Response): Promise<void> => {
-  if (!req.user) {
-    res.status(401).json({
-      error: {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication required.',
-        requestId: req.id ? String(req.id) : undefined,
-      },
-    });
-    return;
-  }
-
-  const userId = req.user.id;
-  const firebaseUid = req.user.firebaseUid;
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      // 1. Soft delete user
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          status: 'DELETED',
-          deletedAt: new Date(),
-        },
-      });
-
-      // 2. Clear private collaboration email on profiles
-      await tx.creatorProfile.updateMany({
-        where: { userId },
-        data: { collaborationEmail: null },
-      });
-
-      await tx.businessProfile.updateMany({
-        where: { userId },
-        data: { collaborationEmail: null },
-      });
-
-      // 3. Cascade active inquiries (PENDING, ACCEPTED) to CLOSED
-      await tx.inquiry.updateMany({
-        where: {
-          OR: [{ businessId: userId }, { creatorId: userId }],
-          status: { in: [InquiryStatus.PENDING, InquiryStatus.ACCEPTED] },
-        },
-        data: {
-          status: InquiryStatus.CLOSED,
-          closedAt: new Date(),
-        },
-      });
-
-      // 4. Record audit event
-      await tx.auditEvent.create({
-        data: {
-          eventType: 'ACCOUNT_DELETED',
-          actorUserId: userId,
-          resourceType: 'USER',
-          resourceId: userId,
-          metadata: { action: 'SOFT_DELETE' },
-        },
-      });
-    });
-
-    // 5. Disable user in Firebase
-    try {
-      await firebaseAdminAuth.updateUser(firebaseUid, { disabled: true });
-      await firebaseAdminAuth.revokeRefreshTokens(firebaseUid);
-    } catch (fbErr: any) {
-      logger.warn({ error: fbErr.message }, 'Firebase user disable error on account deletion');
-    }
-
-    res.status(200).json({
-      message: 'Account successfully deleted.',
-    });
-  } catch (error: any) {
-    logger.error({ error }, 'Failed to delete account');
-    res.status(500).json({
-      error: {
-        code: 'DELETE_ACCOUNT_FAILED',
-        message: 'Failed to process account deletion.',
-        requestId: req.id ? String(req.id) : undefined,
-      },
-    });
-  }
+  return deactivateAccount(req, res);
 };
+
 
 export const deactivateAccount = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {

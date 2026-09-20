@@ -69,6 +69,7 @@ model User {
   savedCreators     SavedCreator[]   @relation("BusinessSavedCreators")
   savedByBusinesses SavedCreator[]   @relation("CreatorSavedByBusinesses")
   notifications     Notification[]
+  emailReservations EmailReservation[]
 
   @@index([role, status])
   @@index([status, deletionScheduledAt])
@@ -190,10 +191,13 @@ model AuditEvent {
 
 model EmailReservation {
   id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @map("user_id") @db.Uuid
   emailHash     String   @unique @map("email_hash") @db.VarChar(64)
   reservedUntil DateTime @map("reserved_until") @db.Timestamptz
   reason        String   @default("ACCOUNT_DELETION") @db.VarChar(50)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([reservedUntil])
   @@map("email_reservations")
