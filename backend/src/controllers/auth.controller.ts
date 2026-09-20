@@ -4,6 +4,8 @@ import { UserRole } from '@prisma/client';
 import prisma from '../database/prisma';
 import { firebaseAdminAuth } from '../config/firebase';
 import { logger } from '../middleware/logger';
+import { AppError } from '../middleware/errorHandler';
+import { hashEmailForReservation, getEmailReservationLockKey } from '../services/deletion.service';
 
 const provisionSchema = z.object({
   role: z.nativeEnum(UserRole, {
@@ -159,9 +161,56 @@ export const provisionUser = async (req: Request, res: Response): Promise<void> 
     return;
   }
 
+  // 1. Enforce active email reservation check before provisioning
+  const emailHash = hashEmailForReservation(decoded.email);
+  const now = new Date();
+  const activeReservation = await prisma.emailReservation.findFirst({
+    where: {
+      emailHash,
+      reservedUntil: { gt: now },
+    },
+    select: { id: true },
+  });
+
+  if (activeReservation) {
+    res.status(403).json({
+      error: {
+        code: 'EMAIL_RESERVED',
+        message: 'This email address is currently reserved and cannot be used to create an account.',
+        requestId: req.id ? String(req.id) : undefined,
+      },
+    });
+    return;
+  }
+
   // Provision new PostgreSQL user inside transaction
   try {
     const newUser = await prisma.$transaction(async (tx) => {
+      // Acquire transaction-scoped advisory lock for the normalized email
+      const lockKey = getEmailReservationLockKey(decoded.email);
+      if (typeof tx.$executeRaw === 'function') {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey});`;
+      }
+
+      // Re-verify reservation under the advisory lock inside transaction
+      if (tx.emailReservation) {
+        const activeInTx = await tx.emailReservation.findFirst({
+          where: {
+            emailHash,
+            reservedUntil: { gt: new Date() },
+          },
+          select: { id: true },
+        });
+
+        if (activeInTx) {
+          throw new AppError(
+            'This email address is currently reserved and cannot be used to create an account.',
+            403,
+            'EMAIL_RESERVED'
+          );
+        }
+      }
+
       const created = await tx.user.create({
         data: {
           firebaseUid: decoded.firebaseUid,
@@ -202,6 +251,17 @@ export const provisionUser = async (req: Request, res: Response): Promise<void> 
       onboardingCompleted: false,
     });
   } catch (error: any) {
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        error: {
+          code: error.code,
+          message: error.message,
+          requestId: req.id ? String(req.id) : undefined,
+        },
+      });
+      return;
+    }
+
     // Handle concurrent duplicate insert race condition
     if (error.code === 'P2002') {
       const duplicateUser = await prisma.user.findUnique({

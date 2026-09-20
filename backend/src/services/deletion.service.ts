@@ -5,15 +5,48 @@ import { firebaseAdminAuth } from '../config/firebase';
 import { logger } from '../middleware/logger';
 
 /**
+ * Canonicalizes an email address according to the application lifecycle standard:
+ * 1. Strips leading and trailing whitespace.
+ * 2. Converts to lowercase.
+ * 3. Applies Unicode NFKC normalization (ensuring compatibility across equivalent character representations).
+ *
+ * Note: Provider-specific transformations (such as stripping dots or plus-addressing)
+ * are intentionally NOT performed to avoid breaking valid email identities.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase().normalize('NFKC');
+}
+
+/**
  * Normalizes and hashes an email for deterministic reservation storage using HMAC-SHA256.
- * Normalization: trim, lowercase, Unicode NFKC.
  */
 export function hashEmailForReservation(email: string): string {
-  const normalized = email.trim().toLowerCase().normalize('NFKC');
+  const normalized = normalizeEmail(email);
   return crypto
     .createHmac('sha256', env.EMAIL_RESERVATION_HMAC_SECRET)
     .update(normalized)
     .digest('hex');
+}
+
+/**
+ * Derives a deterministic 64-bit signed integer (bigint) for PostgreSQL pg_advisory_xact_lock
+ * keyed from the canonicalized email address.
+ *
+ * Coordination Primitive Notes:
+ * - The lock key is an internal concurrency coordination primitive used solely to serialize
+ *   competing transactions for the same email address; it is NOT a security credential.
+ * - The derived integer is never exposed externally to clients.
+ * - Uses SHA-256 with a domain-separated prefix (`cc:email_reservation_lock:`), taking the first 8 bytes as BigInt64BE.
+ * - Practical collision probability is negligible at the expected application scale. In the theoretical event of
+ *   a hash collision, unrelated transactions would merely serialize sequentially; no authorization or data leak occurs.
+ */
+export function getEmailReservationLockKey(email: string): bigint {
+  const normalized = normalizeEmail(email);
+  const digest = crypto
+    .createHash('sha256')
+    .update(`cc:email_reservation_lock:${normalized}`)
+    .digest();
+  return digest.readBigInt64BE(0);
 }
 
 export type PermanentDeletionResult = {
@@ -25,12 +58,13 @@ export type PermanentDeletionResult = {
  * Atomically permanently deletes a DEACTIVATED user whose 30-day grace period has expired.
  * Executed entirely inside a PostgreSQL transaction:
  * 1. Lock user with FOR UPDATE SKIP LOCKED
- * 2. Define single transaction timestamp: permanentDeletedAt
- * 3. Anonymize profile data
- * 4. Create deterministic 180-day email reservation with 4-case conflict handling
- * 5. Enqueue original Firebase UID in pending_firebase_deletions
- * 6. Convert User row into minimal tombstone
- * 7. Write ACCOUNT_PERMANENTLY_DELETED audit event
+ * 2. Acquire transaction-level advisory lock keyed on normalized email
+ * 3. Define single transaction timestamp: permanentDeletedAt
+ * 4. Anonymize profile data
+ * 5. Create deterministic 180-day email reservation with 4-case conflict handling
+ * 6. Enqueue original Firebase UID in pending_firebase_deletions
+ * 7. Convert User row into minimal tombstone
+ * 8. Write ACCOUNT_PERMANENTLY_DELETED audit event
  *
  * NOTE: Absolutely NO Firebase network calls are made inside this transaction.
  */
@@ -62,7 +96,13 @@ export async function permanentlyDeleteUser(userId: string): Promise<PermanentDe
 
     const user = lockedUsers[0];
 
-    // 2. Single Transaction Timestamp & Exactly 180 Days Expiry
+    // 2. Transaction-Scoped Advisory Lock on Normalized Email
+    const lockKey = getEmailReservationLockKey(user.email);
+    if (typeof tx.$executeRaw === 'function') {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey});`;
+    }
+
+    // 3. Single Transaction Timestamp & Exactly 180 Days Expiry
     const permanentDeletedAt = new Date();
     const reservedUntil = new Date(permanentDeletedAt.getTime() + 180 * 24 * 60 * 60 * 1000);
 

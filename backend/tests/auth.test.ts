@@ -6,6 +6,7 @@ import prisma from '../src/database/prisma';
 import { requireRole } from '../src/middleware/requireRole';
 import { authMiddleware } from '../src/middleware/authMiddleware';
 import { UserRole, AccountStatus, InquiryStatus } from '@prisma/client';
+import { hashEmailForReservation } from '../src/services/deletion.service';
 
 describe('Phase 3B Comprehensive Authentication & Security Test Suite', () => {
   let verifyIdTokenSpy: jest.SpyInstance;
@@ -342,6 +343,208 @@ describe('Phase 3B Comprehensive Authentication & Security Test Suite', () => {
       expect(res.status).toBe(200);
       expect(res.body.user.id).toBe('u-race-winner');
       expect(res.body.user.role).toBe('CREATOR');
+    });
+  });
+
+  describe('3.1 Email Reservation Enforcement on Provisioning (Phase 13B-4)', () => {
+    it('should reject provisioning with 403 EMAIL_RESERVED when an active email reservation exists', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb-reserved-uid',
+        email: 'reserved.user@example.com',
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.emailReservation, 'findFirst').mockResolvedValue({
+        id: 'r1000000-0000-4000-8000-000000000001',
+        emailHash: hashEmailForReservation('reserved.user@example.com'),
+        reservedUntil: new Date(Date.now() + 100 * 24 * 60 * 60 * 1000),
+        reason: 'ACCOUNT_DELETION',
+        createdAt: new Date(),
+        userId: null,
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/auth/provision')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ role: 'CREATOR' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('EMAIL_RESERVED');
+      expect(res.body.error.message).toBe(
+        'This email address is currently reserved and cannot be used to create an account.'
+      );
+      // Privacy invariant: internal details must not be leaked to the client
+      expect(res.body.error.emailHash).toBeUndefined();
+      expect(res.body.error.reservedUntil).toBeUndefined();
+      expect(res.body.error.userId).toBeUndefined();
+      expect(res.body.error.reason).toBeUndefined();
+    });
+
+    it('should allow provisioning when an existing email reservation is expired', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb-expired-res-uid',
+        email: 'expired.reservation@example.com',
+        email_verified: true,
+      } as any);
+
+      // findFirst with reservedUntil: { gt: now } returns null when reservation is expired
+      jest.spyOn(prisma.emailReservation, 'findFirst').mockResolvedValue(null);
+
+      const createUserMock = jest.fn().mockResolvedValue({
+        id: 'u-expired-res-success',
+        firebaseUid: 'fb-expired-res-uid',
+        email: 'expired.reservation@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.ACTIVE,
+        createdAt: new Date(),
+      });
+
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          user: { create: createUserMock },
+          auditEvent: { create: jest.fn().mockResolvedValue({}) },
+          emailReservation: { findFirst: jest.fn().mockResolvedValue(null) },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/auth/provision')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ role: 'CREATOR' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.user.email).toBe('expired.reservation@example.com');
+      expect(res.body.user.role).toBe('CREATOR');
+      expect(createUserMock).toHaveBeenCalled();
+    });
+
+    it('should allow provisioning when no email reservation exists', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb-clean-uid',
+        email: 'brand.new@example.com',
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.emailReservation, 'findFirst').mockResolvedValue(null);
+
+      const createUserMock = jest.fn().mockResolvedValue({
+        id: 'u-clean-success',
+        firebaseUid: 'fb-clean-uid',
+        email: 'brand.new@example.com',
+        role: UserRole.BUSINESS,
+        status: AccountStatus.ACTIVE,
+        createdAt: new Date(),
+      });
+
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          user: { create: createUserMock },
+          auditEvent: { create: jest.fn().mockResolvedValue({}) },
+          emailReservation: { findFirst: jest.fn().mockResolvedValue(null) },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/auth/provision')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ role: 'BUSINESS' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.user.email).toBe('brand.new@example.com');
+      expect(createUserMock).toHaveBeenCalled();
+    });
+
+    it('should reject provisioning when email differs only by case (case normalization)', async () => {
+      const canonicalEmail = 'case.reserved@example.com';
+      const variantEmail = '  Case.Reserved@EXAMPLE.COM  ';
+
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb-case-uid',
+        email: variantEmail,
+        email_verified: true,
+      } as any);
+
+      const expectedHash = hashEmailForReservation(canonicalEmail);
+      const findFirstSpy = jest.spyOn(prisma.emailReservation, 'findFirst').mockResolvedValue({
+        id: 'r2000000-0000-4000-8000-000000000002',
+        emailHash: expectedHash,
+        reservedUntil: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000),
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/auth/provision')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ role: 'CREATOR' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('EMAIL_RESERVED');
+      expect(findFirstSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            emailHash: expectedHash,
+          }),
+        })
+      );
+    });
+
+    it('should reject provisioning when email uses Unicode NFKC equivalent characters', async () => {
+      // Kelvin symbol (\u212A 'K') normalizes to lowercase ASCII 'k' under NFKC
+      const nfkcEmail = 'user\u212A@example.com';
+      const asciiEquivalent = 'userk@example.com';
+
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb-nfkc-uid',
+        email: nfkcEmail,
+        email_verified: true,
+      } as any);
+
+      const expectedHash = hashEmailForReservation(asciiEquivalent);
+      const findFirstSpy = jest.spyOn(prisma.emailReservation, 'findFirst').mockResolvedValue({
+        id: 'r3000000-0000-4000-8000-000000000003',
+        emailHash: expectedHash,
+        reservedUntil: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000),
+      } as any);
+
+      const res = await request(app)
+        .post('/api/v1/auth/provision')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ role: 'CREATOR' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('EMAIL_RESERVED');
+      expect(findFirstSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            emailHash: expectedHash,
+          }),
+        })
+      );
+    });
+
+    it('should ensure email reservation check happens before User creation and rejected signup does not create a PostgreSQL User', async () => {
+      verifyIdTokenSpy.mockResolvedValue({
+        uid: 'fb-blocked-uid',
+        email: 'blocked@example.com',
+        email_verified: true,
+      } as any);
+
+      jest.spyOn(prisma.emailReservation, 'findFirst').mockResolvedValue({
+        id: 'r4000000-0000-4000-8000-000000000004',
+        emailHash: hashEmailForReservation('blocked@example.com'),
+        reservedUntil: new Date(Date.now() + 50 * 24 * 60 * 60 * 1000),
+      } as any);
+
+      const transactionSpy = jest.spyOn(prisma, '$transaction');
+
+      const res = await request(app)
+        .post('/api/v1/auth/provision')
+        .set('Authorization', 'Bearer valid-token')
+        .send({ role: 'CREATOR' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('EMAIL_RESERVED');
+      // Proves that $transaction was not called and no user was created in the database
+      expect(transactionSpy).not.toHaveBeenCalled();
     });
   });
 
