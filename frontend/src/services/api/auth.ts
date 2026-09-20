@@ -3,11 +3,16 @@ import { UserRole, AccountStatus } from '@creator-connect/shared';
 
 export interface AppUser {
   id: string;
-  firebaseUid: string;
+  firebaseUid?: string;
   email: string;
   role: UserRole;
   status: AccountStatus;
   createdAt: string;
+  deactivatedAt?: string | null;
+  deletionScheduledAt?: string | null;
+  daysRemaining?: number;
+  isReactivatable?: boolean;
+  displayName?: string | null;
 }
 
 export interface AuthMeResponse {
@@ -22,6 +27,23 @@ export interface ProvisionResponse {
   onboardingCompleted: boolean;
 }
 
+export interface DeactivateResponse {
+  message: string;
+  deactivatedAt: string;
+  deletionScheduledAt: string;
+  daysRemaining: number;
+}
+
+export interface ReactivateResponse {
+  message: string;
+  user: {
+    id: string;
+    email: string;
+    role: UserRole;
+    status: AccountStatus;
+  };
+}
+
 export const authApi = {
   getMe: async (): Promise<AuthMeResponse> => {
     const response = await apiClient.get<AuthMeResponse>('/auth/me');
@@ -33,8 +55,13 @@ export const authApi = {
     return response.data;
   },
 
-  deleteAccount: async (): Promise<{ message: string }> => {
-    const response = await apiClient.post<{ message: string }>('/auth/delete-account');
+  deactivate: async (): Promise<DeactivateResponse> => {
+    const response = await apiClient.post<DeactivateResponse>('/auth/deactivate');
+    return response.data;
+  },
+
+  reactivate: async (): Promise<ReactivateResponse> => {
+    const response = await apiClient.post<ReactivateResponse>('/auth/reactivate');
     return response.data;
   },
 };

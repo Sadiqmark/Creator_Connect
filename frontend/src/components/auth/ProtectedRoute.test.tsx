@@ -60,6 +60,22 @@ describe('ProtectedRoute Navigation & Role Provisioning Guards', () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <div>Account Settings Page</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/reactivate"
+            element={
+              <ProtectedRoute>
+                <div>Reactivate Account Page</div>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </MemoryRouter>
     );
@@ -163,5 +179,100 @@ describe('ProtectedRoute Navigation & Role Provisioning Guards', () => {
 
     renderWithRouter('/select-role');
     expect(screen.getByText('Business Dashboard')).toBeInTheDocument();
+  });
+
+  it('7. redirects DEACTIVATED user from /creator/dashboard to /account/reactivate', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: 'DEACTIVATED',
+      firebaseUser: { uid: 'u1', emailVerified: true } as any,
+      appUser: {
+        id: 'u-1',
+        email: 'creator@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.DEACTIVATED,
+        createdAt: new Date().toISOString(),
+        daysRemaining: 30,
+      },
+      onboardingCompleted: false,
+    } as any);
+
+    renderWithRouter('/creator/dashboard');
+    expect(screen.getByText('Reactivate Account Page')).toBeInTheDocument();
+  });
+
+  it('8. redirects DEACTIVATED user from /settings to /account/reactivate', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: 'DEACTIVATED',
+      firebaseUser: { uid: 'u1', emailVerified: true } as any,
+      appUser: {
+        id: 'u-1',
+        email: 'creator@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.DEACTIVATED,
+        createdAt: new Date().toISOString(),
+        daysRemaining: 30,
+      },
+      onboardingCompleted: false,
+    } as any);
+
+    renderWithRouter('/settings');
+    expect(screen.getByText('Reactivate Account Page')).toBeInTheDocument();
+  });
+
+  it('9. redirects DEACTIVATED user from /onboarding/creator to /account/reactivate', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: 'DEACTIVATED',
+      firebaseUser: { uid: 'u1', emailVerified: true } as any,
+      appUser: {
+        id: 'u-1',
+        email: 'creator@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.DEACTIVATED,
+        createdAt: new Date().toISOString(),
+        daysRemaining: 30,
+      },
+      onboardingCompleted: false,
+    } as any);
+
+    renderWithRouter('/onboarding/creator');
+    expect(screen.getByText('Reactivate Account Page')).toBeInTheDocument();
+  });
+
+  it('10. allows DEACTIVATED user to render /account/reactivate', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: 'DEACTIVATED',
+      firebaseUser: { uid: 'u1', emailVerified: true } as any,
+      appUser: {
+        id: 'u-1',
+        email: 'creator@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.DEACTIVATED,
+        createdAt: new Date().toISOString(),
+        daysRemaining: 30,
+      },
+      onboardingCompleted: false,
+    } as any);
+
+    renderWithRouter('/account/reactivate');
+    expect(screen.getByText('Reactivate Account Page')).toBeInTheDocument();
+  });
+
+  it('11. redirects AUTHENTICATED user from /account/reactivate to role dashboard', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      status: 'AUTHENTICATED',
+      firebaseUser: { uid: 'u1', emailVerified: true } as any,
+      appUser: {
+        id: 'u-1',
+        firebaseUid: 'u1',
+        email: 'creator@example.com',
+        role: UserRole.CREATOR,
+        status: AccountStatus.ACTIVE,
+        createdAt: new Date().toISOString(),
+      },
+      onboardingCompleted: true,
+    } as any);
+
+    renderWithRouter('/account/reactivate');
+    expect(screen.getByText('Creator Dashboard')).toBeInTheDocument();
   });
 });

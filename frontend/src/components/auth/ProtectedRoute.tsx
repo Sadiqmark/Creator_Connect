@@ -35,6 +35,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     return <Navigate to="/login" state={{ sessionExpired: true, from: location }} replace />;
   }
 
+  // Deactivated accounts can only access /account/reactivate
+  if (status === 'DEACTIVATED' || appUser?.status === 'DEACTIVATED') {
+    if (location.pathname === '/account/reactivate') {
+      return <>{children}</>;
+    }
+    return <Navigate to="/account/reactivate" replace />;
+  }
+
+  // Active / authenticated accounts cannot access /account/reactivate
+  if (location.pathname === '/account/reactivate') {
+    const dashboardRoute =
+      appUser?.role === UserRole.CREATOR ? '/creator/dashboard' : '/business/dashboard';
+    return <Navigate to={dashboardRoute} replace />;
+  }
+
   // Handle unprovisioned users needing role selection
   if (!appUser) {
     if (location.pathname === '/select-role') {

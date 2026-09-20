@@ -23,6 +23,8 @@ import { BusinessProfileViewPage } from './pages/creator/BusinessProfileViewPage
 import { SavedCreatorsPage } from './pages/business/SavedCreatorsPage';
 import { BusinessInquiriesPage } from './pages/business/BusinessInquiriesPage';
 import { BusinessInquiryDetailPage } from './pages/business/BusinessInquiryDetailPage';
+import { AccountSettingsPage } from './pages/account/AccountSettingsPage';
+import { ReactivateAccountPage } from './pages/account/ReactivateAccountPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -44,6 +46,10 @@ const RootRedirect: React.FC = () => {
 
   if (status === 'UNVERIFIED') {
     return <Navigate to="/verify-email" replace />;
+  }
+
+  if (status === 'DEACTIVATED' || appUser?.status === 'DEACTIVATED') {
+    return <Navigate to="/account/reactivate" replace />;
   }
 
   if (!appUser) {
@@ -69,12 +75,11 @@ export const App: React.FC = () => {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Public Browsing Routes (Phase 4A locked decision #2: Guests can browse & view) */}
+        {/* Public Discovery Routes */}
         <Route path="/creators" element={<CreatorDiscoveryPage />} />
         <Route path="/creators/:creatorId" element={<PublicCreatorProfilePage />} />
-        <Route path="/businesses/:businessId" element={<BusinessProfileViewPage />} />
 
-        {/* Protected Role Provisioning */}
+        {/* Role Selection & Onboarding */}
         <Route
           path="/select-role"
           element={
@@ -83,8 +88,6 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
-
-        {/* Protected Creator Routes */}
         <Route
           path="/onboarding/creator"
           element={
@@ -93,6 +96,16 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/onboarding/business"
+          element={
+            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
+              <BusinessOnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Creator Protected Workspace */}
         <Route
           path="/creator/dashboard"
           element={
@@ -125,16 +138,16 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
-
-        {/* Protected Business Routes */}
         <Route
-          path="/onboarding/business"
+          path="/creator/business-profile/:businessId"
           element={
-            <ProtectedRoute allowedRole={UserRole.BUSINESS}>
-              <BusinessOnboardingPage />
+            <ProtectedRoute allowedRole={UserRole.CREATOR}>
+              <BusinessProfileViewPage />
             </ProtectedRoute>
           }
         />
+
+        {/* Business Protected Workspace */}
         <Route
           path="/business/dashboard"
           element={
@@ -160,10 +173,6 @@ export const App: React.FC = () => {
           }
         />
         <Route
-          path="/business/saved"
-          element={<Navigate to="/business/saved-creators" replace />}
-        />
-        <Route
           path="/business/inquiries"
           element={
             <ProtectedRoute allowedRole={UserRole.BUSINESS}>
@@ -176,6 +185,26 @@ export const App: React.FC = () => {
           element={
             <ProtectedRoute allowedRole={UserRole.BUSINESS}>
               <BusinessInquiryDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected Account Settings (both roles supported) */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <AccountSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Account Reactivation (Deactivated accounts only) */}
+        <Route
+          path="/account/reactivate"
+          element={
+            <ProtectedRoute>
+              <ReactivateAccountPage />
             </ProtectedRoute>
           }
         />

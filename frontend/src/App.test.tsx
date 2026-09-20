@@ -33,18 +33,19 @@ vi.mock('./services/api/auth', () => ({
   authApi: {
     getMe: vi.fn(),
     provision: vi.fn(),
-    deleteAccount: vi.fn(),
+    deactivate: vi.fn(),
+    reactivate: vi.fn(),
   },
 }));
 
-const renderApp = (initialRoute = '/login') => {
+const renderApp = (initialRoute: string | { pathname: string; state?: any } = '/login') => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialRoute]}>
+      <MemoryRouter initialEntries={[initialRoute as any]}>
         <AuthProvider>
           <App />
         </AuthProvider>
@@ -243,6 +244,42 @@ describe('Phase 3B Comprehensive Frontend E2E & Flow Verification', () => {
         expect(screen.getByRole('heading', { name: /Session Expired/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Sign In Again/i })).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('6. Account Lifecycle & Banners (Phase 13B)', () => {
+    it('renders LoginPage with dismissible accountDeactivated banner when navigated with state.accountDeactivated', async () => {
+      renderApp({ pathname: '/login', state: { accountDeactivated: true } });
+
+      expect(
+        screen.getByText(
+          'Your account has been deactivated. You have 30 days to sign back in and reactivate before permanent deletion.'
+        )
+      ).toBeInTheDocument();
+
+      const dismissBtn = screen.getByLabelText(/Dismiss banner/i);
+      fireEvent.click(dismissBtn);
+
+      expect(
+        screen.queryByText(
+          'Your account has been deactivated. You have 30 days to sign back in and reactivate before permanent deletion.'
+        )
+      ).toBeNull();
+    });
+
+    it('renders LoginPage with dismissible accountDeleted banner when navigated with state.accountDeleted', async () => {
+      renderApp({ pathname: '/login', state: { accountDeleted: true } });
+
+      expect(
+        screen.getByText('This account has been permanently deleted.')
+      ).toBeInTheDocument();
+
+      const dismissBtn = screen.getByLabelText(/Dismiss banner/i);
+      fireEvent.click(dismissBtn);
+
+      expect(
+        screen.queryByText('This account has been permanently deleted.')
+      ).toBeNull();
     });
   });
 });

@@ -22,6 +22,7 @@ import {
   Eye,
   Loader2,
   Briefcase,
+  Settings,
 } from 'lucide-react';
 
 export const BusinessDashboard: React.FC = () => {
@@ -95,6 +96,14 @@ export const BusinessDashboard: React.FC = () => {
             >
               <Briefcase className="w-3.5 h-3.5" />
               Brand Profile
+            </Link>
+
+            <Link
+              to="/settings"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Settings
             </Link>
 
             <button

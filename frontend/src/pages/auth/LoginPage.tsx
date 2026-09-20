@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { authApi } from '../../services/api/auth';
 import { UserRole } from '@creator-connect/shared';
-import { Sparkles, ArrowRight, AlertCircle } from 'lucide-react';
+import { Sparkles, ArrowRight, AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, appUser, onboardingCompleted } = useAuth();
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [accountDeactivatedBanner, setAccountDeactivatedBanner] = useState<boolean>(
+    Boolean((location.state as any)?.accountDeactivated)
+  );
+  const [accountDeletedBanner, setAccountDeletedBanner] = useState<boolean>(
+    Boolean((location.state as any)?.accountDeleted)
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,21 +34,35 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
+      // Authoritative account state check to handle deactivation correctly
+      const me = await authApi.getMe().catch(() => null);
+
+      if (me?.user?.status === 'DEACTIVATED') {
+        navigate('/account/reactivate');
+        return;
+      }
+
       const fromPath = (location.state as any)?.from?.pathname;
-      if (fromPath) {
+      if (fromPath && fromPath !== '/account/reactivate') {
         navigate(fromPath);
         return;
       }
 
-      if (!appUser) {
+      if (!me?.user) {
         navigate('/select-role');
-      } else if (!onboardingCompleted) {
-        navigate(appUser.role === UserRole.CREATOR ? '/onboarding/creator' : '/onboarding/business');
+      } else if (!me.onboardingCompleted) {
+        navigate(me.user.role === UserRole.CREATOR ? '/onboarding/creator' : '/onboarding/business');
       } else {
-        navigate(appUser.role === UserRole.CREATOR ? '/creator/dashboard' : '/business/dashboard');
+        navigate(me.user.role === UserRole.CREATOR ? '/creator/dashboard' : '/business/dashboard');
       }
     } catch (err: any) {
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+      if (err.code === 'ACCOUNT_DELETED') {
+        setErrorMessage('This account has been permanently deleted.');
+      } else if (
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/user-not-found'
+      ) {
         setErrorMessage('Invalid email or password. Please try again.');
       } else if (err.code === 'auth/too-many-requests') {
         setErrorMessage('Too many failed attempts. Please wait a few minutes before retrying.');
@@ -74,6 +95,50 @@ export const LoginPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-surface py-8 px-6 shadow-sm border border-border sm:rounded-2xl sm:px-10">
+          {accountDeactivatedBanner && (
+            <div
+              role="status"
+              className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start justify-between gap-3 text-amber-800 dark:text-amber-300"
+            >
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm font-medium">
+                  Your account has been deactivated. You have 30 days to sign back in and reactivate before permanent deletion.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAccountDeactivatedBanner(false)}
+                aria-label="Dismiss banner"
+                className="text-amber-600 dark:text-amber-400 hover:opacity-75 transition-opacity cursor-pointer p-0.5"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {accountDeletedBanner && (
+            <div
+              role="status"
+              className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start justify-between gap-3 text-red-700 dark:text-red-400"
+            >
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm font-medium">
+                  This account has been permanently deleted.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAccountDeletedBanner(false)}
+                aria-label="Dismiss banner"
+                className="text-red-600 dark:text-red-400 hover:opacity-75 transition-opacity cursor-pointer p-0.5"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {errorMessage && (
             <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-800">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />

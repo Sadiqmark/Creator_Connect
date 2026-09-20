@@ -18,6 +18,7 @@ export type AuthStatus =
   | 'UNVERIFIED'
   | 'ONBOARDING_REQUIRED'
   | 'AUTHENTICATED'
+  | 'DEACTIVATED'
   | 'SESSION_EXPIRED';
 
 interface AuthContextValue {
@@ -30,6 +31,8 @@ interface AuthContextValue {
   signUp: (email: string, password: string) => Promise<FirebaseUser>;
   signIn: (email: string, password: string) => Promise<FirebaseUser>;
   signOut: () => Promise<void>;
+  deactivateAccount: () => Promise<void>;
+  reactivateAccount: () => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   reloadUser: () => Promise<boolean>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -62,7 +65,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(data.profile);
       setOnboardingCompleted(data.onboardingCompleted);
 
-      if (!data.onboardingCompleted) {
+      if (data.user?.status === 'DEACTIVATED') {
+        setStatus('DEACTIVATED');
+      } else if (!data.onboardingCompleted) {
         setStatus('ONBOARDING_REQUIRED');
       } else {
         setStatus('AUTHENTICATED');
@@ -74,10 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
       } else if (err.code === 'EMAIL_NOT_VERIFIED') {
         setStatus('UNVERIFIED');
+      } else if (err.code === 'ACCOUNT_DEACTIVATED') {
+        setStatus('DEACTIVATED');
       } else if (err.code === 'ACCOUNT_DELETED') {
         await firebaseSignOut(auth);
         setStatus('UNAUTHENTICATED');
-        setError('This account has been deleted.');
+        setError('This account has been permanently deleted.');
       } else {
         setStatus('UNAUTHENTICATED');
       }
@@ -149,6 +156,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStatus('UNAUTHENTICATED');
   };
 
+  const deactivateAccount = async (): Promise<void> => {
+    // 1. Deactivate backend account while Firebase authentication token is still valid
+    await authApi.deactivate();
+
+    // 2. Only after backend deactivation succeeds, sign out from Firebase
+    try {
+      await firebaseSignOut(auth);
+    } catch {
+      // Security-sensitive fallback: if Firebase sign-out fails (e.g. network issue),
+      // we still wipe local authenticated state below so private UI is not shown.
+    }
+
+    // 3. Clear local user and profile state and set status to UNAUTHENTICATED
+    setFirebaseUser(null);
+    setAppUser(null);
+    setProfile(null);
+    setOnboardingCompleted(false);
+    setStatus('UNAUTHENTICATED');
+  };
+
+  const reactivateAccount = async (): Promise<void> => {
+    // 1. Call backend reactivate endpoint
+    await authApi.reactivate();
+
+    // 2. Refresh Firebase ID token to get updated claims/state
+    await auth.currentUser?.getIdToken(true);
+
+    // 3. Re-fetch fresh application user profile from /auth/me
+    if (auth.currentUser) {
+      await fetchAppUser(auth.currentUser);
+    }
+  };
+
   const sendVerification = async (): Promise<void> => {
     if (auth.currentUser) {
       await sendEmailVerification(auth.currentUser);
@@ -204,6 +244,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signIn,
         signOut,
+        deactivateAccount,
+        reactivateAccount,
         sendVerificationEmail: sendVerification,
         reloadUser,
         sendPasswordReset,
