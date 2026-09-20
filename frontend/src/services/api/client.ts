@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { auth } from '../../config/firebase';
+import { normalizeApiError } from './errors';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -47,7 +48,7 @@ apiClient.interceptors.response.use(
     const statusCode = error.response?.status;
 
     // If token expired, attempt one force-refresh before failing
-    if (statusCode === 401 && errorCode === 'TOKEN_EXPIRED' && !originalRequest._retry) {
+    if (statusCode === 401 && errorCode === 'TOKEN_EXPIRED' && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         const currentUser = auth.currentUser;
@@ -61,13 +62,7 @@ apiClient.interceptors.response.use(
       }
     }
 
-    const customError = {
-      message: error.response?.data?.error?.message || error.message || 'An unexpected error occurred.',
-      code: errorCode || 'UNKNOWN_ERROR',
-      statusCode: statusCode || 500,
-      requestId: error.response?.data?.error?.requestId,
-    };
-
-    return Promise.reject(customError);
+    const appError = normalizeApiError(error);
+    return Promise.reject(appError);
   }
 );

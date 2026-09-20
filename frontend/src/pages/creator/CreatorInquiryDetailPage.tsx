@@ -7,6 +7,7 @@ import {
   rejectInquiry,
   InquiryStatus,
 } from '../../services/api/inquiries';
+import { isConflictError } from '../../services/api/errors';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import {
   InquiryActionConfirmationModal,
@@ -55,11 +56,8 @@ export const CreatorInquiryDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['creator-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] });
     },
-    onError: (err: any) => {
-      if (
-        err.response?.status === 409 ||
-        err.response?.data?.error?.code === 'INVALID_INQUIRY_STATE'
-      ) {
+    onError: (err: unknown) => {
+      if (isConflictError(err)) {
         setModalAction(null);
         setStaleStateError(
           'This collaboration proposal is no longer pending. It has already been responded to or has expired.'
@@ -80,11 +78,8 @@ export const CreatorInquiryDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['creator-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] });
     },
-    onError: (err: any) => {
-      if (
-        err.response?.status === 409 ||
-        err.response?.data?.error?.code === 'INVALID_INQUIRY_STATE'
-      ) {
+    onError: (err: unknown) => {
+      if (isConflictError(err)) {
         setModalAction(null);
         setStaleStateError(
           'This collaboration proposal is no longer pending. It has already been responded to or has expired.'
@@ -98,7 +93,9 @@ export const CreatorInquiryDetailPage: React.FC = () => {
 
   const isMutating = acceptMutation.isPending || rejectMutation.isPending;
   const mutationError =
-    acceptMutation.error?.message || rejectMutation.error?.message || null;
+    (acceptMutation.error as Error | null)?.message ||
+    (rejectMutation.error as Error | null)?.message ||
+    null;
 
   const handleConfirmAction = () => {
     if (modalAction === 'ACCEPT') {
@@ -255,12 +252,29 @@ export const CreatorInquiryDetailPage: React.FC = () => {
 
         {/* 409 Stale-State Conflict Alert */}
         {staleStateError && (
-          <div className="p-4 rounded-2xl bg-danger/10 border border-danger/30 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-bold text-danger">State Conflict</h3>
-              <p className="text-xs text-foreground-muted mt-0.5">{staleStateError}</p>
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="p-4 rounded-2xl bg-danger/10 border border-danger/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-bold text-danger">State Conflict</h3>
+                <p className="text-xs text-foreground-muted mt-0.5">{staleStateError}</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStaleStateError(null);
+                refetch();
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface border border-border text-foreground hover:bg-surface-muted transition-colors shrink-0 shadow-subtle cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Refresh Inquiry</span>
+            </button>
           </div>
         )}
 
