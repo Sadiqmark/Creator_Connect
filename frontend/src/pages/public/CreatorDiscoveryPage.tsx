@@ -13,6 +13,7 @@ import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { useToast } from '../../components/ui/Toast';
 import { normalizeApiError } from '../../services/api/errors';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
@@ -54,6 +55,7 @@ const APPROVED_NICHES = [
 export const CreatorDiscoveryPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { appUser } = useAuth();
   const isBusiness = appUser?.role === UserRole.BUSINESS;
   const isCreator = appUser?.role === UserRole.CREATOR;
@@ -189,10 +191,18 @@ export const CreatorDiscoveryPage: React.FC = () => {
 
       return { previousIds };
     },
+    onSuccess: (_data, variables) => {
+      if (variables.currentlySaved) {
+        toast.success('Creator removed from saved');
+      } else {
+        toast.success('Creator saved to bookmarks');
+      }
+    },
     onError: (_err, _variables, context) => {
       if (context?.previousIds) {
         queryClient.setQueryData(['saved-creator-ids'], context.previousIds);
       }
+      toast.error('Failed to update saved creator. Please try again.');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-creator-ids'] });

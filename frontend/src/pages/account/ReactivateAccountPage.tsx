@@ -36,10 +36,10 @@ export const ReactivateAccountPage: React.FC = () => {
 
     try {
       await reactivateAccount();
-      // On success, redirect to dashboard based on role
+      // On success, redirect to dashboard based on role with navigation state
       const dashboardRoute =
         appUser?.role === UserRole.CREATOR ? '/creator/dashboard' : '/business/dashboard';
-      navigate(dashboardRoute, { replace: true });
+      navigate(dashboardRoute, { replace: true, state: { accountReactivated: true } });
     } catch (err: any) {
       if (err.code === 'GRACE_PERIOD_EXPIRED' || err.status === 410) {
         setErrorMessage('The 30-day reactivation grace period has expired. This account is scheduled for permanent deletion.');

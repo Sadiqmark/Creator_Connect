@@ -14,11 +14,12 @@ import {
   Globe,
   Instagram,
   AlertCircle,
-  CheckCircle2,
   Loader2,
   Eye,
   ArrowLeft,
 } from 'lucide-react';
+import { useToast } from '../../components/ui/Toast';
+import { normalizeApiError } from '../../services/api/errors';
 
 const BUSINESS_CATEGORIES = [
   'Fashion & Apparel',
@@ -44,11 +45,11 @@ const BUSINESS_CATEGORIES = [
 export const BusinessProfilePage: React.FC = () => {
   const { appUser } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<BusinessPrivateProfile | null>(null);
@@ -145,7 +146,6 @@ export const BusinessProfilePage: React.FC = () => {
     if (!validate()) return;
 
     setIsSaving(true);
-    setSaveSuccess(false);
     setSaveError(null);
 
     try {
@@ -163,7 +163,7 @@ export const BusinessProfilePage: React.FC = () => {
       });
 
       setProfile(updated);
-      setSaveSuccess(true);
+      toast.success('Brand profile updated successfully');
 
       // Invalidate concrete dependent queries
       queryClient.invalidateQueries({ queryKey: ['business-profile-me'] });
@@ -171,10 +171,9 @@ export const BusinessProfilePage: React.FC = () => {
       if (updated.id) {
         queryClient.invalidateQueries({ queryKey: ['business', updated.id] });
       }
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
-      setSaveError(err.message || 'Failed to update business profile.');
+    } catch (err: unknown) {
+      const appErr = normalizeApiError(err);
+      setSaveError(appErr.message || 'Failed to update business profile.');
     } finally {
       setIsSaving(false);
     }
@@ -221,13 +220,6 @@ export const BusinessProfilePage: React.FC = () => {
         </div>
 
         {/* Alerts */}
-        {saveSuccess && (
-          <div className="p-4 bg-success/10 border border-success/30 rounded-xl flex items-center gap-2 text-sm text-success animate-fadeIn">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>Business profile successfully saved and updated!</span>
-          </div>
-        )}
-
         {saveError && (
           <div className="p-4 bg-danger/10 border border-danger/30 rounded-xl flex items-center gap-2 text-sm text-danger animate-fadeIn">
             <AlertCircle className="w-4 h-4 shrink-0" />

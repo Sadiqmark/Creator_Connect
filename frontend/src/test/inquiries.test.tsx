@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { InquiryFormModal } from '../components/inquiry/InquiryFormModal';
+import { ToastProvider } from '../components/ui/Toast';
 import * as inquiriesApi from '../services/api/inquiries';
 
 vi.mock('../services/api/inquiries');
@@ -93,16 +94,19 @@ describe('Phase 7B Frontend Inquiry Form Modal Test Suite', () => {
     vi.mocked(inquiriesApi.createInquiry).mockResolvedValue({ inquiry: mockCreatedInquiry });
 
     const onSuccessMock = vi.fn();
+    const onCloseMock = vi.fn();
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <InquiryFormModal
-          creator={mockCreator}
-          isOpen={true}
-          onClose={vi.fn()}
-          onSuccess={onSuccessMock}
-        />
-      </QueryClientProvider>
+      <ToastProvider>
+        <QueryClientProvider client={queryClient}>
+          <InquiryFormModal
+            creator={mockCreator}
+            isOpen={true}
+            onClose={onCloseMock}
+            onSuccess={onSuccessMock}
+          />
+        </QueryClientProvider>
+      </ToastProvider>
     );
 
     // Fill form
@@ -131,7 +135,8 @@ describe('Phase 7B Frontend Inquiry Form Modal Test Suite', () => {
         })
       );
       expect(onSuccessMock).toHaveBeenCalledWith(mockCreatedInquiry);
-      expect(screen.getByText(/Inquiry Sent Successfully/i)).toBeInTheDocument();
+      expect(onCloseMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/Collaboration proposal sent successfully/i)).toBeInTheDocument();
     });
   });
 

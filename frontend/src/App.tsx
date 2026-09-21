@@ -28,6 +28,7 @@ import { ReactivateAccountPage } from './pages/account/ReactivateAccountPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { ToastProvider } from './components/ui/Toast';
 
 const RootRedirect: React.FC = () => {
   const { status, appUser } = useAuth();
@@ -66,7 +67,7 @@ const RootRedirect: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <>
+    <ToastProvider>
       <Routes>
         {/* Public Auth Routes */}
         <Route path="/login" element={<LoginPage />} />
@@ -217,7 +218,7 @@ export const App: React.FC = () => {
 
       {/* Global Session Expired Dialog */}
       <SessionExpiredModal />
-    </>
+    </ToastProvider>
   );
 };
 export default App;

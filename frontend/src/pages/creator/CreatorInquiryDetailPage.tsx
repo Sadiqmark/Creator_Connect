@@ -12,6 +12,7 @@ import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { useToast } from '../../components/ui/Toast';
 import {
   InquiryActionConfirmationModal,
   InquiryActionType,
@@ -38,6 +39,7 @@ import {
 export const CreatorInquiryDetailPage: React.FC = () => {
   const { inquiryId } = useParams<{ inquiryId: string }>();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [modalAction, setModalAction] = useState<InquiryActionType | null>(null);
   const [staleStateError, setStaleStateError] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export const CreatorInquiryDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['creator-inquiry-detail', inquiryId] });
       queryClient.invalidateQueries({ queryKey: ['creator-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] });
+      toast.success('Collaboration proposal accepted');
     },
     onError: (err: unknown) => {
       if (isConflictError(err)) {
@@ -80,6 +83,7 @@ export const CreatorInquiryDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['creator-inquiry-detail', inquiryId] });
       queryClient.invalidateQueries({ queryKey: ['creator-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] });
+      toast.success('Collaboration proposal declined');
     },
     onError: (err: unknown) => {
       if (isConflictError(err)) {

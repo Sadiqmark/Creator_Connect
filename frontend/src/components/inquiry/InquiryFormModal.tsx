@@ -5,12 +5,13 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createInquiry, InquiryDTO } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../ui/AvatarWithFallback';
+import { useToast } from '../ui/Toast';
+import { normalizeApiError, isConflictError } from '../../services/api/errors';
 import {
   X,
   Send,
   Loader2,
   AlertCircle,
-  CheckCircle2,
   Calendar,
   Sparkles,
   MapPin,
@@ -123,9 +124,9 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
   onSuccess,
 }) => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [generalError, setGeneralError] = useState<string | null>(null);
-  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
 
   const {
     register,
@@ -171,26 +172,24 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
       });
     },
     onSuccess: (res) => {
-      setIsSubmittedSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['active-inquiry', creator.id] });
       queryClient.invalidateQueries({ queryKey: ['business-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['business-dashboard'] });
       if (onSuccess) {
         onSuccess(res.inquiry);
       }
-      setTimeout(() => {
-        setIsSubmittedSuccess(false);
-        reset();
-        onClose();
-      }, 1500);
+      reset();
+      onClose();
+      toast.success('Collaboration proposal sent successfully');
     },
-    onError: (err: any) => {
-      if (err.code === 'DUPLICATE_ACTIVE_INQUIRY' || err.statusCode === 409) {
+    onError: (err: unknown) => {
+      const appErr = normalizeApiError(err);
+      if (isConflictError(appErr) || appErr.code === 'DUPLICATE_ACTIVE_INQUIRY') {
         setConflictError(
-          err.message || 'You already have an active inquiry with this creator.'
+          appErr.message || 'You already have an active inquiry with this creator.'
         );
       } else {
-        setGeneralError(err.message || 'Failed to submit inquiry. Please try again.');
+        setGeneralError(appErr.message || 'Failed to submit inquiry. Please try again.');
       }
     },
   });
@@ -251,19 +250,7 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
           </button>
         </div>
 
-        {/* Success Confirmation State */}
-        {isSubmittedSuccess ? (
-          <div className="p-10 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground">Inquiry Sent Successfully</h3>
-            <p className="text-sm text-foreground-muted max-w-md">
-              Your structured proposal has been delivered to {creator.name}. You will be notified when they respond.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
             {/* Conflict Error (409) */}
             {conflictError && (
               <div
@@ -520,7 +507,6 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
               </div>
             </div>
           </form>
-        )}
       </div>
     </div>
   );

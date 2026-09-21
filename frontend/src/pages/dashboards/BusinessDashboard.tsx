@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -12,6 +12,7 @@ import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { useToast } from '../../components/ui/Toast';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Building2,
@@ -29,6 +30,17 @@ import {
 
 export const BusinessDashboard: React.FC = () => {
   const { appUser, signOut } = useAuth();
+  const location = useLocation();
+  const toast = useToast();
+  const reactivatedToastShownRef = useRef(false);
+
+  useEffect(() => {
+    if (location.state?.accountReactivated && !reactivatedToastShownRef.current) {
+      reactivatedToastShownRef.current = true;
+      toast.success('Account successfully reactivated');
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, toast]);
 
   const {
     data: summary = null,

@@ -10,6 +10,7 @@ import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { useToast } from '../../components/ui/Toast';
 import { normalizeApiError } from '../../services/api/errors';
 import {
   Bookmark,
@@ -22,6 +23,7 @@ import {
 
 export const SavedCreatorsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [page, setPage] = useState(1);
   const limit = 24;
 
@@ -70,6 +72,9 @@ export const SavedCreatorsPage: React.FC = () => {
 
       return { prevSavedData, prevIds };
     },
+    onSuccess: () => {
+      toast.success('Creator removed from saved');
+    },
     onError: (_err, _vars, context) => {
       if (context?.prevSavedData) {
         queryClient.setQueryData(['saved-creators', { page, limit }], context.prevSavedData);
@@ -77,6 +82,7 @@ export const SavedCreatorsPage: React.FC = () => {
       if (context?.prevIds) {
         queryClient.setQueryData(['saved-creator-ids'], context.prevIds);
       }
+      toast.error('Failed to update saved creator. Please try again.');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-creators'] });

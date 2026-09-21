@@ -84,7 +84,10 @@ describe('ReactivateAccountPage Component Tests', () => {
 
     await waitFor(() => {
       expect(mockReactivateAccount).toHaveBeenCalledTimes(1);
-      expect(mockNavigate).toHaveBeenCalledWith('/creator/dashboard', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/creator/dashboard', {
+        replace: true,
+        state: { accountReactivated: true },
+      });
     });
   });
 
@@ -110,7 +113,10 @@ describe('ReactivateAccountPage Component Tests', () => {
 
     await waitFor(() => {
       expect(mockReactivateAccount).toHaveBeenCalledTimes(1);
-      expect(mockNavigate).toHaveBeenCalledWith('/business/dashboard', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/business/dashboard', {
+        replace: true,
+        state: { accountReactivated: true },
+      });
     });
   });
 

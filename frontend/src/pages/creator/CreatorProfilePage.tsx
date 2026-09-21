@@ -20,6 +20,8 @@ import {
   Eye,
   ArrowLeft,
 } from 'lucide-react';
+import { useToast } from '../../components/ui/Toast';
+import { normalizeApiError } from '../../services/api/errors';
 
 const POPULAR_NICHES = [
   'Fashion & Style',
@@ -37,11 +39,11 @@ const POPULAR_NICHES = [
 export const CreatorProfilePage: React.FC = () => {
   const { appUser } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<CreatorPrivateProfile | null>(null);
@@ -138,7 +140,6 @@ export const CreatorProfilePage: React.FC = () => {
     if (!validate()) return;
 
     setIsSaving(true);
-    setSaveSuccess(false);
     setSaveError(null);
 
     try {
@@ -155,7 +156,7 @@ export const CreatorProfilePage: React.FC = () => {
       });
 
       setProfile(updated);
-      setSaveSuccess(true);
+      toast.success('Profile updated successfully');
 
       // Invalidate concrete dependent queries
       queryClient.invalidateQueries({ queryKey: ['creators'] });
@@ -163,10 +164,9 @@ export const CreatorProfilePage: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['creator', updated.id] });
       }
       queryClient.invalidateQueries({ queryKey: ['creator-dashboard'] });
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
-      setSaveError(err.message || 'Failed to update profile.');
+    } catch (err: unknown) {
+      const appErr = normalizeApiError(err);
+      setSaveError(appErr.message || 'Failed to update profile.');
     } finally {
       setIsSaving(false);
     }
@@ -238,14 +238,6 @@ export const CreatorProfilePage: React.FC = () => {
                   : 'Complete all required fields (Name, Niche, Location, Bio, Content Specialties, and at least one Social link) to appear in brand searches.'}
               </p>
             </div>
-          </div>
-        )}
-
-        {/* Success Alert */}
-        {saveSuccess && (
-          <div className="p-4 bg-success/10 border border-success/30 rounded-xl flex items-center gap-2 text-sm text-success animate-fadeIn">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>Profile successfully saved and updated!</span>
           </div>
         )}
 
