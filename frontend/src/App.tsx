@@ -29,6 +29,7 @@ import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { ToastProvider } from './components/ui/Toast';
+import { OfflineBanner } from './components/ui/OfflineBanner';
 
 const RootRedirect: React.FC = () => {
   const { status, appUser } = useAuth();
@@ -68,6 +69,7 @@ const RootRedirect: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ToastProvider>
+      <OfflineBanner />
       <Routes>
         {/* Public Auth Routes */}
         <Route path="/login" element={<LoginPage />} />

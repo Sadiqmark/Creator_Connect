@@ -144,7 +144,11 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
         </div>
       </div>
 
-      {(uploadError || error) && <p className="text-xs text-danger font-medium">{uploadError || error}</p>}
+      {(uploadError || error) && (
+        <p role="alert" className="text-xs text-danger font-medium">
+          {uploadError || error}
+        </p>
+      )}
     </div>
   );
 };

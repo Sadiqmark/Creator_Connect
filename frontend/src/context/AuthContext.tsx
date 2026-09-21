@@ -11,6 +11,7 @@ import {
 import { auth } from '../config/firebase';
 import { authApi, AppUser } from '../services/api/auth';
 import { UserRole } from '@creator-connect/shared';
+import { queryClient } from '../lib/queryClient';
 
 export type AuthStatus =
   | 'INITIALIZING'
@@ -115,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleSessionExpired = () => {
       setStatus('SESSION_EXPIRED');
+      queryClient.clear();
     };
 
     window.addEventListener('auth:session-expired', handleSessionExpired);
@@ -154,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setOnboardingCompleted(false);
     setStatus('UNAUTHENTICATED');
+    queryClient.clear();
   };
 
   const deactivateAccount = async (): Promise<void> => {
@@ -174,6 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setOnboardingCompleted(false);
     setStatus('UNAUTHENTICATED');
+    queryClient.clear();
   };
 
   const reactivateAccount = async (): Promise<void> => {
@@ -230,6 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearSessionExpired = () => {
     setStatus('UNAUTHENTICATED');
+    queryClient.clear();
   };
 
   return (

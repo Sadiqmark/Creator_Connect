@@ -43,21 +43,32 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-    const errorCode = error.response?.data?.error?.code;
-    const statusCode = error.response?.status;
+    const originalRequest = error?.config;
+    const errorCode = error?.response?.data?.error?.code;
+    const statusCode = error?.response?.status;
 
-    // If token expired, attempt one force-refresh before failing
-    if (statusCode === 401 && errorCode === 'TOKEN_EXPIRED' && originalRequest && !originalRequest._retry) {
-      originalRequest._retry = true;
-      try {
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          const freshToken = await currentUser.getIdToken(true);
-          originalRequest.headers.Authorization = `Bearer ${freshToken}`;
-          return apiClient(originalRequest);
+    // Handle 401 Unauthorized responses
+    if (statusCode === 401) {
+      // If token expired and request has not yet been retried, attempt one force-refresh
+      if (errorCode === 'TOKEN_EXPIRED' && originalRequest && !originalRequest._retry) {
+        originalRequest._retry = true;
+        try {
+          const currentUser = auth.currentUser;
+          if (currentUser) {
+            const freshToken = await currentUser.getIdToken(true);
+            if (freshToken) {
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+              return apiClient(originalRequest);
+            }
+          }
+        } catch {
+          // Token refresh failed; proceed below to deterministic session expiry dispatch
         }
-      } catch {
+      }
+
+      // Unrecoverable 401 (refresh failed, retried request still 401, or non-refreshable 401)
+      if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('auth:session-expired'));
       }
     }

@@ -30,7 +30,9 @@ describe('PhotoUpload Component — Cloudinary Direct Unsigned Upload', () => {
     fireEvent.change(input, { target: { files: [invalidFile] } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Please select a JPG, PNG, WEBP, or GIF image\./i)).toBeInTheDocument();
+      const alert = screen.getByRole('alert');
+      expect(alert).toBeInTheDocument();
+      expect(alert).toHaveTextContent(/Please select a JPG, PNG, WEBP, or GIF image\./i);
     });
 
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -57,7 +59,9 @@ describe('PhotoUpload Component — Cloudinary Direct Unsigned Upload', () => {
     fireEvent.change(input, { target: { files: [oversizedFile] } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Image size must be less than 5MB\./i)).toBeInTheDocument();
+      const alert = screen.getByRole('alert');
+      expect(alert).toBeInTheDocument();
+      expect(alert).toHaveTextContent(/Image size must be less than 5MB\./i);
     });
 
     expect(fetchSpy).not.toHaveBeenCalled();
