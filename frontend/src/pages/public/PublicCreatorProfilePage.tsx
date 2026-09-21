@@ -11,6 +11,10 @@ import {
 } from '../../services/api/savedCreators';
 import { listBusinessInquiries } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { isNotFoundError } from '../../services/api/errors';
 import { InquiryFormModal } from '../../components/inquiry/InquiryFormModal';
 import {
   MapPin,
@@ -20,7 +24,6 @@ import {
   Send,
   CheckCircle2,
   ArrowLeft,
-  Loader2,
   AlertCircle,
   ExternalLink,
   Sparkles,
@@ -41,6 +44,7 @@ export const PublicCreatorProfilePage: React.FC = () => {
     isLoading,
     isError,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['creator', creatorId],
     queryFn: () => getPublicCreatorProfile(creatorId!),
@@ -126,29 +130,70 @@ export const PublicCreatorProfilePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto space-y-6" aria-label="Loading creator profile">
+          <Skeleton variant="text" className="w-32 h-4" />
+
+          <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-card space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                <Skeleton variant="circular" className="w-24 h-24 shrink-0" />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Skeleton variant="text" className="w-48 h-8 rounded-lg" />
+                    <Skeleton className="w-20 h-5 rounded-full" />
+                  </div>
+                  <Skeleton variant="text" className="w-36 h-4" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <Skeleton className="h-10 w-24 rounded-xl" />
+                <Skeleton className="h-10 w-32 rounded-xl" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
+            <Skeleton variant="text" className="w-24 h-5" />
+            <SkeletonText lines={3} />
+          </div>
+
+          <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
+            <Skeleton variant="text" className="w-28 h-5" />
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="w-20 h-7 rounded-lg" />
+              <Skeleton className="w-24 h-7 rounded-lg" />
+              <Skeleton className="w-16 h-7 rounded-lg" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (isError || !creator) {
+    const isNotFound = isNotFoundError(error) || (!creator && !isLoading);
     return (
       <div className="min-h-screen bg-background py-16 px-4 flex flex-col items-center justify-center text-center">
-        <AlertCircle className="w-12 h-12 text-foreground-muted mb-4" />
-        <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-          Profile Not Available
-        </h1>
-        <p className="text-sm text-foreground-muted max-w-md mb-6">
-          {(error as any)?.message ||
-            'The requested creator profile could not be found or is not currently discoverable.'}
-        </p>
-        <Link
-          to="/creators"
-          className="px-4 py-2 bg-foreground text-surface rounded-lg text-sm font-semibold hover:bg-foreground/90 transition-colors"
-        >
-          Browse All Creators
-        </Link>
+        <div className="max-w-md w-full">
+          {isNotFound ? (
+            <EmptyState
+              icon={<AlertCircle className="w-8 h-8" />}
+              title="Profile Not Available"
+              description="The requested creator profile could not be found or is not currently discoverable."
+              action={{
+                label: 'Browse All Creators',
+                href: '/creators',
+              }}
+            />
+          ) : (
+            <ErrorState
+              title="Unable to load profile."
+              message="We encountered an issue retrieving this creator profile. Please try again."
+              onRetry={() => refetch()}
+            />
+          )}
+        </div>
       </div>
     );
   }

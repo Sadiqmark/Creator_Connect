@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPublicBusinessProfile, BusinessPublicProfile } from '../../services/api/businesses';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { isNotFoundError } from '../../services/api/errors';
 import {
   MapPin,
   Globe,
   Instagram,
   ArrowLeft,
   ExternalLink,
-  Loader2,
   AlertCircle,
   Briefcase,
 } from 'lucide-react';
@@ -19,33 +22,59 @@ export const BusinessProfileViewPage: React.FC = () => {
   const [business, setBusiness] = useState<BusinessPublicProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isNotFound, setIsNotFound] = useState(false);
+
+  const fetchBusiness = useCallback(async () => {
+    if (!businessId) return;
+    setIsLoading(true);
+    setError(null);
+    setIsNotFound(false);
+    try {
+      const data = await getPublicBusinessProfile(businessId);
+      setBusiness(data);
+    } catch (err: unknown) {
+      if (isNotFoundError(err)) {
+        setIsNotFound(true);
+        setError('The requested business brand profile could not be found.');
+      } else {
+        setIsNotFound(false);
+        setError('We encountered an issue loading this business profile. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [businessId]);
 
   useEffect(() => {
-    const fetchBusiness = async () => {
-      if (!businessId) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await getPublicBusinessProfile(businessId);
-        setBusiness(data);
-      } catch (err: any) {
-        if (err.statusCode === 404) {
-          setError('Business profile not found.');
-        } else {
-          setError(err.message || 'Failed to load business profile.');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchBusiness();
-  }, [businessId]);
+  }, [fetchBusiness]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto space-y-6" aria-label="Loading business profile">
+          <Skeleton variant="text" className="w-32 h-4" />
+          <div className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-card space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <Skeleton variant="rectangular" className="w-20 h-20 rounded-xl shrink-0" />
+              <div className="space-y-2.5 flex-1">
+                <Skeleton variant="text" className="w-48 h-8 rounded-lg" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="w-24 h-5 rounded-full" />
+                  <Skeleton variant="text" className="w-32 h-4" />
+                </div>
+              </div>
+            </div>
+            <div className="pt-6 border-t border-border flex items-center gap-3">
+              <Skeleton variant="text" className="w-24 h-4" />
+              <Skeleton className="w-20 h-7 rounded-lg" />
+            </div>
+          </div>
+          <div className="bg-surface rounded-2xl border border-border p-6 sm:p-8 shadow-card space-y-4">
+            <Skeleton variant="text" className="w-32 h-5" />
+            <SkeletonText lines={3} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -53,19 +82,25 @@ export const BusinessProfileViewPage: React.FC = () => {
   if (error || !business) {
     return (
       <div className="min-h-screen bg-background py-16 px-4 flex flex-col items-center justify-center text-center">
-        <AlertCircle className="w-12 h-12 text-foreground-muted mb-4" />
-        <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-          Business Profile Not Found
-        </h1>
-        <p className="text-sm text-foreground-muted max-w-md mb-6">
-          {error || 'The requested business brand profile is not available.'}
-        </p>
-        <Link
-          to="/"
-          className="px-4 py-2 bg-foreground text-surface rounded-lg text-sm font-semibold hover:bg-foreground/90 transition-colors"
-        >
-          Return Home
-        </Link>
+        <div className="max-w-md w-full">
+          {isNotFound || !business ? (
+            <EmptyState
+              icon={<AlertCircle className="w-8 h-8" />}
+              title="Business Profile Not Found"
+              description={error || 'The requested business brand profile is not available.'}
+              action={{
+                label: 'Back to Workspace',
+                href: '/creator/dashboard',
+              }}
+            />
+          ) : (
+            <ErrorState
+              title="Unable to load profile."
+              message={error}
+              onRetry={fetchBusiness}
+            />
+          )}
+        </div>
       </div>
     );
   }

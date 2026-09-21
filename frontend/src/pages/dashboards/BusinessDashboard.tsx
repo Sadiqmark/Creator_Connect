@@ -9,6 +9,9 @@ import {
   BusinessPrivateProfile,
 } from '../../services/api/businesses';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Building2,
@@ -20,7 +23,6 @@ import {
   Search,
   ArrowRight,
   Eye,
-  Loader2,
   Briefcase,
   Settings,
 } from 'lucide-react';
@@ -32,6 +34,7 @@ export const BusinessDashboard: React.FC = () => {
     data: summary = null,
     isLoading: isSummaryLoading,
     error: summaryError,
+    refetch: refetchSummary,
   } = useQuery<BusinessDashboardSummary>({
     queryKey: ['business-dashboard'],
     queryFn: getBusinessDashboard,
@@ -40,13 +43,14 @@ export const BusinessDashboard: React.FC = () => {
   const {
     data: profile = null,
     isLoading: isProfileLoading,
+    refetch: refetchProfile,
   } = useQuery<BusinessPrivateProfile>({
     queryKey: ['business-profile-me'],
     queryFn: getMyBusinessProfile,
   });
 
   const isLoading = isSummaryLoading || isProfileLoading;
-  const error = summaryError ? ((summaryError as any).message || 'Failed to load business dashboard.') : null;
+  const error = summaryError ? 'We could not load your brand dashboard. Please check your connection and try again.' : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -161,13 +165,27 @@ export const BusinessDashboard: React.FC = () => {
 
         {/* Metrics Grid */}
         {isLoading ? (
-          <div className="py-12 flex justify-center">
-            <Loader2 className="w-8 h-8 text-accent animate-spin" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Loading dashboard metrics">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-5 bg-surface border border-border rounded-2xl shadow-card space-y-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton variant="text" className="w-20 h-3" />
+                  <Skeleton variant="circular" className="w-4 h-4 shrink-0" />
+                </div>
+                <Skeleton variant="text" className="w-16 h-8 rounded-lg" />
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="p-4 bg-danger/10 border border-danger/20 rounded-xl text-sm text-danger">
-            {error}
-          </div>
+          <ErrorState
+            variant="banner"
+            title="Unable to load brand dashboard."
+            message={error}
+            onRetry={() => {
+              refetchSummary();
+              refetchProfile();
+            }}
+          />
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -257,19 +275,16 @@ export const BusinessDashboard: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-sm text-foreground-muted">
-                    <Bookmark className="w-6 h-6 mx-auto text-foreground-subtle mb-1.5" />
-                    <p className="font-semibold text-foreground">No saved creators</p>
-                    <p className="text-xs mt-1">
-                      Browse creators in the directory and bookmark candidates for future campaigns.
-                    </p>
-                    <Link
-                      to="/creators"
-                      className="inline-block mt-3 px-3.5 py-1.5 bg-foreground text-surface rounded-lg text-xs font-semibold"
-                    >
-                      Browse Directory
-                    </Link>
-                  </div>
+                  <EmptyState
+                    compact={true}
+                    icon={<Bookmark className="w-5 h-5" />}
+                    title="No saved creators"
+                    description="Browse creators in the directory and bookmark candidates for future campaigns."
+                    action={{
+                      label: 'Browse Directory',
+                      href: '/creators',
+                    }}
+                  />
                 )}
               </div>
 
@@ -325,13 +340,12 @@ export const BusinessDashboard: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-sm text-foreground-muted">
-                    <Send className="w-6 h-6 mx-auto text-foreground-subtle mb-1.5" />
-                    <p className="font-semibold text-foreground">No inquiries sent</p>
-                    <p className="text-xs mt-1">
-                      Ready to start a partnership? Visit a creator profile and send a proposal.
-                    </p>
-                  </div>
+                  <EmptyState
+                    compact={true}
+                    icon={<Send className="w-5 h-5" />}
+                    title="No inquiries sent"
+                    description="Ready to start a partnership? Visit a creator profile and send a proposal."
+                  />
                 )}
               </div>
             </div>

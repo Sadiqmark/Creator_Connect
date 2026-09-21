@@ -10,6 +10,10 @@ import {
   unsaveCreator,
 } from '../../services/api/savedCreators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { normalizeApiError } from '../../services/api/errors';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Search,
@@ -20,8 +24,6 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
-  AlertCircle,
-  RefreshCw,
   X,
 } from 'lucide-react';
 
@@ -374,66 +376,54 @@ export const CreatorDiscoveryPage: React.FC = () => {
 
         {/* Content Section */}
         {isLoading ? (
-          /* Skeleton Loading Cards */
+          /* Layout-Matching Skeleton Loading Cards */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-label="Loading creators">
             {Array.from({ length: 6 }).map((_, idx) => (
               <div
                 key={idx}
-                className="bg-surface rounded-2xl border border-border p-5 shadow-card animate-pulse space-y-4"
+                className="bg-surface rounded-2xl border border-border p-5 shadow-card space-y-4"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-full bg-surface-muted" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-surface-muted rounded w-3/4" />
-                    <div className="h-3 bg-surface-muted rounded w-1/2" />
+                  <Skeleton variant="circular" className="w-12 h-12 shrink-0" />
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <Skeleton variant="text" className="h-4 w-3/4" />
+                    <Skeleton variant="text" className="h-3 w-1/2" />
                   </div>
                 </div>
-                <div className="h-3 bg-surface-muted rounded w-1/3" />
-                <div className="space-y-1.5">
-                  <div className="h-2.5 bg-surface-muted rounded w-full" />
-                  <div className="h-2.5 bg-surface-muted rounded w-5/6" />
-                </div>
-                <div className="pt-3 border-t border-border flex justify-between">
-                  <div className="h-8 bg-surface-muted rounded w-full" />
+                <Skeleton variant="text" className="h-3 w-1/3" />
+                <SkeletonText lines={2} />
+                <div className="pt-3 border-t border-border">
+                  <Skeleton className="h-8 w-full rounded-xl" />
                 </div>
               </div>
             ))}
           </div>
         ) : isError ? (
           /* Error State with Retry */
-          <div className="p-8 text-center bg-danger/10 border border-danger/20 rounded-2xl space-y-3">
-            <AlertCircle className="w-8 h-8 text-danger mx-auto" />
-            <p className="text-sm font-semibold text-danger">
-              {(error as any)?.message || 'Failed to load creators from marketplace.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-surface text-foreground border border-border rounded-lg text-xs font-semibold hover:bg-surface-muted transition-colors shadow-subtle"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Retry
-            </button>
-          </div>
+          <ErrorState
+            title="Unable to load creators."
+            message={normalizeApiError(error).message}
+            onRetry={() => refetch()}
+            retryLabel="Retry"
+          />
         ) : creators.length === 0 ? (
           /* Empty State */
-          <div className="py-16 text-center bg-surface rounded-2xl border border-border p-8 space-y-3">
-            <p className="font-display text-xl font-bold text-foreground">
-              No Creators Found
-            </p>
-            <p className="text-sm text-foreground-muted max-w-sm mx-auto">
-              We couldn't find discoverable creators matching your current search or filters.
-            </p>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="px-4 py-2 text-xs font-semibold bg-surface-muted hover:bg-border rounded-lg border border-border transition-colors text-foreground"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={<Search className="w-6 h-6" />}
+            title="No Creators Found"
+            description="We couldn't find discoverable creators matching your current search or filters."
+            action={
+              hasActiveFilters
+                ? {
+                    label: 'Clear Filters',
+                    onClick: handleClearFilters,
+                    variant: 'secondary',
+                  }
+                : undefined
+            }
+          />
         ) : (
+
           /* Creator Cards Grid */
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

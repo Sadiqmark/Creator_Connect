@@ -7,14 +7,16 @@ import {
   SavedCreatorItem,
 } from '../../services/api/savedCreators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { normalizeApiError } from '../../services/api/errors';
 import {
   Bookmark,
   MapPin,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
-  AlertCircle,
-  RefreshCw,
   Trash2,
 } from 'lucide-react';
 
@@ -124,63 +126,45 @@ export const SavedCreatorsPage: React.FC = () => {
 
         {/* Content Section */}
         {isLoading ? (
-          /* Skeletons */
+          /* Layout-Matching Skeletons */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-label="Loading saved creators">
             {Array.from({ length: 3 }).map((_, idx) => (
               <div
                 key={idx}
-                className="bg-surface rounded-2xl border border-border p-5 shadow-card animate-pulse space-y-4"
+                className="bg-surface rounded-2xl border border-border p-5 shadow-card space-y-4"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-full bg-surface-muted" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-surface-muted rounded w-3/4" />
-                    <div className="h-3 bg-surface-muted rounded w-1/2" />
+                  <Skeleton variant="circular" className="w-12 h-12 shrink-0" />
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <Skeleton variant="text" className="h-4 w-3/4" />
+                    <Skeleton variant="text" className="h-3 w-1/2" />
                   </div>
                 </div>
-                <div className="h-3 bg-surface-muted rounded w-1/3" />
-                <div className="h-8 bg-surface-muted rounded w-full" />
+                <Skeleton variant="text" className="h-3 w-1/3" />
+                <div className="pt-2">
+                  <Skeleton className="h-8 w-full rounded-xl" />
+                </div>
               </div>
             ))}
           </div>
         ) : isError ? (
           /* Error State */
-          <div className="p-8 text-center bg-danger/10 border border-danger/20 rounded-2xl space-y-3">
-            <AlertCircle className="w-8 h-8 text-danger mx-auto" />
-            <p className="text-sm font-semibold text-danger">
-              {(error as any)?.message || 'Failed to load saved creators.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-surface text-foreground border border-border rounded-lg text-xs font-semibold hover:bg-surface-muted transition-colors shadow-subtle"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Retry
-            </button>
-          </div>
+          <ErrorState
+            title="Unable to load saved creators."
+            message={normalizeApiError(error).message}
+            onRetry={() => refetch()}
+          />
         ) : savedList.length === 0 ? (
           /* Empty State */
-          <div className="py-20 text-center bg-surface rounded-2xl border border-border p-8 space-y-4 shadow-card">
-            <div className="w-12 h-12 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto">
-              <Bookmark className="w-6 h-6" />
-            </div>
-            <div className="space-y-1 max-w-sm mx-auto">
-              <h2 className="font-display text-lg font-bold text-foreground">
-                No saved creators yet.
-              </h2>
-              <p className="text-xs text-foreground-muted">
-                Browse our curated creator marketplace and bookmark creators you'd like to partner with.
-              </p>
-            </div>
-            <div>
-              <Link
-                to="/creators"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white rounded-xl text-xs font-semibold hover:bg-accent/90 transition-colors shadow-subtle"
-              >
-                Discover Creators
-              </Link>
-            </div>
-          </div>
+          <EmptyState
+            icon={<Bookmark className="w-6 h-6" />}
+            title="No saved creators yet."
+            description="Browse our curated creator marketplace and bookmark creators you'd like to partner with."
+            action={{
+              label: 'Discover Creators',
+              href: '/creators',
+            }}
+          />
         ) : (
           /* Saved Creators Grid */
           <div className="space-y-6">

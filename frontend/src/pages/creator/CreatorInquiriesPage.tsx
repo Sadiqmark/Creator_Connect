@@ -7,6 +7,10 @@ import {
   CreatorInquiryListItem,
 } from '../../services/api/inquiries';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { normalizeApiError } from '../../services/api/errors';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Inbox,
@@ -17,7 +21,6 @@ import {
   Archive,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
   Calendar,
   Layers,
   MapPin,
@@ -144,56 +147,43 @@ export const CreatorInquiriesPage: React.FC = () => {
             {Array.from({ length: 3 }).map((_, idx) => (
               <div
                 key={idx}
-                className="bg-surface rounded-2xl border border-border p-6 shadow-card animate-pulse space-y-4"
+                className="bg-surface rounded-2xl border border-border p-6 shadow-card space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-surface-muted" />
+                  <div className="flex items-center gap-3.5">
+                    <Skeleton variant="circular" className="w-12 h-12 shrink-0" />
                     <div className="space-y-2">
-                      <div className="h-4 bg-surface-muted rounded w-40" />
-                      <div className="h-3 bg-surface-muted rounded w-24" />
+                      <Skeleton variant="text" className="w-40 h-4" />
+                      <Skeleton variant="text" className="w-24 h-3" />
                     </div>
                   </div>
-                  <div className="h-6 bg-surface-muted rounded-full w-24" />
+                  <Skeleton className="w-24 h-6 rounded-full" />
                 </div>
-                <div className="h-4 bg-surface-muted rounded w-3/4" />
+                <Skeleton variant="text" className="w-3/4 h-4" />
               </div>
             ))}
           </div>
         ) : isError ? (
           /* Error State */
-          <div className="p-8 text-center bg-surface border border-danger/20 rounded-2xl shadow-card space-y-3">
-            <p className="text-sm font-semibold text-danger">
-              {(error as any)?.message || 'Failed to load inquiries.'}
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-2 bg-surface border border-border rounded-xl text-xs font-bold text-foreground hover:bg-surface-muted inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Try Again
-            </button>
-          </div>
+          <ErrorState
+            title="Unable to load inquiries."
+            message={normalizeApiError(error).message}
+            onRetry={() => refetch()}
+          />
         ) : inquiries.length === 0 ? (
           /* Empty State */
-          <div className="py-16 text-center bg-surface border border-border rounded-2xl shadow-card space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-surface-muted mx-auto flex items-center justify-center text-foreground-subtle">
-              <Inbox className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-foreground">No inquiries found</h3>
-              <p className="text-xs text-foreground-muted mt-1 max-w-sm mx-auto">
-                {selectedTab === 'ALL'
-                  ? 'You have not received any collaboration proposals yet. Ensure your profile is complete and discoverable.'
-                  : `There are currently no inquiries in "${selectedTab}" state.`}
-              </p>
-            </div>
-            <Link
-              to="/creator/profile"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-foreground text-surface rounded-xl text-xs font-semibold hover:bg-foreground/90 transition-colors shadow-subtle"
-            >
-              View Profile Settings
-            </Link>
-          </div>
+          <EmptyState
+            icon={<Inbox className="w-6 h-6" />}
+            title="No inquiries found"
+            description={
+              selectedTab === 'ALL'
+                ? 'You have not received any collaboration proposals yet. Ensure your profile is complete and discoverable.'
+                : `There are currently no inquiries in "${selectedTab}" state.`}
+            action={{
+              label: 'View Profile Settings',
+              href: '/creator/profile',
+            }}
+          />
         ) : (
           /* Inquiry List Cards */
           <div className="space-y-4">

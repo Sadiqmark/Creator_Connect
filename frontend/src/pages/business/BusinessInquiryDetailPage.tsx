@@ -2,7 +2,11 @@ import React from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getBusinessInquiryDetail, InquiryStatus } from '../../services/api/inquiries';
+import { isNotFoundError, normalizeApiError } from '../../services/api/errors';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { CreatorContactCard } from '../../components/inquiry/InquiryContactCard';
 import {
   ArrowLeft,
@@ -17,7 +21,6 @@ import {
   FileText,
   Instagram,
   Youtube,
-  RefreshCw,
   MapPin,
   Sparkles,
 } from 'lucide-react';
@@ -128,30 +131,68 @@ export const BusinessInquiryDetailPage: React.FC = () => {
 
         {/* Loading State */}
         {isLoading ? (
-          <div className="space-y-6 animate-pulse" aria-label="Loading inquiry details">
-            <div className="h-16 bg-surface rounded-2xl border border-border" />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 h-96 bg-surface rounded-2xl border border-border" />
-              <div className="h-96 bg-surface rounded-2xl border border-border" />
+          <div className="space-y-6" aria-label="Loading inquiry details">
+            <Skeleton className="h-16 rounded-2xl w-full" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-card space-y-6">
+                  <div className="space-y-2">
+                    <Skeleton className="w-20 h-5 rounded-full" />
+                    <Skeleton variant="text" className="w-64 h-8 rounded-lg" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton variant="text" className="w-28 h-4" />
+                    <Skeleton className="h-24 rounded-xl w-full" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton variant="text" className="w-40 h-4" />
+                    <Skeleton className="h-24 rounded-xl w-full" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton variant="circular" className="w-12 h-12 shrink-0" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton variant="text" className="w-32 h-4" />
+                      <Skeleton variant="text" className="w-20 h-3" />
+                    </div>
+                  </div>
+                  <SkeletonText lines={2} />
+                </div>
+                <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-3">
+                  <Skeleton variant="text" className="w-28 h-4" />
+                  <Skeleton variant="text" className="w-36 h-6" />
+                </div>
+              </div>
             </div>
           </div>
         ) : isError || !inquiry ? (
           /* Error State */
-          <div className="p-8 text-center bg-surface border border-border rounded-2xl shadow-card space-y-3">
-            <p className="text-base font-bold text-foreground">Inquiry Not Found</p>
-            <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-              {(error as any)?.message ||
-                'The inquiry you requested does not exist or you do not have permission to view it.'}
-            </p>
-            <div className="pt-2">
-              <button
-                onClick={() => refetch()}
-                className="px-4 py-2 bg-surface border border-border rounded-xl text-xs font-bold text-foreground hover:bg-surface-muted inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Retry
-              </button>
-            </div>
-          </div>
+          (() => {
+            const isNotFound = isNotFoundError(error) || (!inquiry && !isLoading);
+            const errorMessage = error
+              ? normalizeApiError(error).message
+              : 'The inquiry you requested does not exist or you do not have permission to view it.';
+            return isNotFound ? (
+              <EmptyState
+                icon={<AlertTriangle className="w-8 h-8" />}
+                title="Inquiry Not Found"
+                description={errorMessage}
+                action={{
+                  label: 'Back to Inquiries',
+                  href: '/business/inquiries',
+                }}
+              />
+            ) : (
+              <ErrorState
+                title="Unable to load inquiry."
+                message={errorMessage}
+                onRetry={() => refetch()}
+              />
+            );
+          })()
         ) : (
           /* Main Content Layout */
           <div className="space-y-6">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -8,6 +8,9 @@ import {
   CreatorPrivateProfile,
 } from '../../services/api/creators';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
 import {
   Sparkles,
@@ -19,7 +22,6 @@ import {
   AlertCircle,
   User,
   Eye,
-  Loader2,
   ArrowRight,
   Settings,
 } from 'lucide-react';
@@ -32,31 +34,32 @@ export const CreatorDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [dashSummary, profileData] = await Promise.allSettled([
-          getCreatorDashboard(),
-          getMyCreatorProfile(),
-        ]);
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [dashSummary, profileData] = await Promise.allSettled([
+        getCreatorDashboard(),
+        getMyCreatorProfile(),
+      ]);
 
-        if (dashSummary.status === 'fulfilled') {
-          setSummary(dashSummary.value);
-        }
-        if (profileData.status === 'fulfilled') {
-          setProfile(profileData.value);
-        }
-      } catch (err: any) {
-        setError(err.message || 'Failed to load creator dashboard.');
-      } finally {
-        setIsLoading(false);
+      if (dashSummary.status === 'fulfilled') {
+        setSummary(dashSummary.value);
       }
-    };
-
-    loadDashboardData();
+      if (profileData.status === 'fulfilled') {
+        setProfile(profileData.value);
+      }
+    } catch {
+      setError('Unable to load dashboard data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -193,13 +196,24 @@ export const CreatorDashboard: React.FC = () => {
 
         {/* Metrics Cards */}
         {isLoading ? (
-          <div className="py-12 flex justify-center">
-            <Loader2 className="w-8 h-8 text-accent animate-spin" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Loading dashboard metrics">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-5 bg-surface border border-border rounded-2xl shadow-card space-y-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton variant="text" className="w-20 h-3" />
+                  <Skeleton variant="circular" className="w-4 h-4 shrink-0" />
+                </div>
+                <Skeleton variant="text" className="w-16 h-8 rounded-lg" />
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="p-4 bg-danger/10 border border-danger/20 rounded-xl text-sm text-danger">
-            {error}
-          </div>
+          <ErrorState
+            variant="banner"
+            title="Unable to load dashboard data."
+            message={error}
+            onRetry={loadDashboardData}
+          />
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -299,14 +313,12 @@ export const CreatorDashboard: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="py-10 text-center text-sm text-foreground-muted">
-                  <Inbox className="w-8 h-8 mx-auto text-foreground-subtle mb-2" />
-                  <p className="font-semibold text-foreground">No inquiries yet</p>
-                  <p className="text-xs mt-1 max-w-sm mx-auto">
-                    Ensure your profile is discoverable and active so brands can send collaboration
-                    proposals.
-                  </p>
-                </div>
+                <EmptyState
+                  compact={true}
+                  icon={<Inbox className="w-6 h-6" />}
+                  title="No inquiries yet"
+                  description="Ensure your profile is discoverable and active so brands can send collaboration proposals."
+                />
               )}
             </div>
           </>

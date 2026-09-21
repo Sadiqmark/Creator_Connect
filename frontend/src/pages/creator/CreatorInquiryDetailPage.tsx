@@ -7,8 +7,11 @@ import {
   rejectInquiry,
   InquiryStatus,
 } from '../../services/api/inquiries';
-import { isConflictError } from '../../services/api/errors';
+import { isConflictError, isNotFoundError, normalizeApiError } from '../../services/api/errors';
 import { AvatarWithFallback } from '../../components/ui/AvatarWithFallback';
+import { Skeleton, SkeletonText } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import {
   InquiryActionConfirmationModal,
   InquiryActionType,
@@ -189,12 +192,42 @@ export const CreatorInquiryDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto space-y-6 animate-pulse" aria-label="Loading inquiry details">
-          <div className="h-6 bg-surface-muted rounded w-32" />
-          <div className="h-20 bg-surface rounded-2xl border border-border" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 h-96 bg-surface rounded-2xl border border-border" />
-            <div className="h-96 bg-surface rounded-2xl border border-border" />
+        <div className="max-w-5xl mx-auto space-y-6" aria-label="Loading inquiry details">
+          <Skeleton variant="text" className="w-32 h-4" />
+          <Skeleton className="h-20 rounded-2xl w-full" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-card space-y-6">
+                <div className="space-y-2">
+                  <Skeleton className="w-20 h-5 rounded-full" />
+                  <Skeleton variant="text" className="w-64 h-8 rounded-lg" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton variant="text" className="w-28 h-4" />
+                  <Skeleton className="h-24 rounded-xl w-full" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton variant="text" className="w-40 h-4" />
+                  <Skeleton className="h-24 rounded-xl w-full" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton variant="circular" className="w-12 h-12 shrink-0" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton variant="text" className="w-32 h-4" />
+                    <Skeleton variant="text" className="w-20 h-3" />
+                  </div>
+                </div>
+                <SkeletonText lines={2} />
+              </div>
+              <div className="bg-surface border border-border rounded-2xl p-6 shadow-card space-y-3">
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -202,31 +235,30 @@ export const CreatorInquiryDetailPage: React.FC = () => {
   }
 
   if (isError || !inquiry) {
+    const isNotFound = isNotFoundError(error) || (!inquiry && !isLoading);
+    const errorMessage = error
+      ? normalizeApiError(error).message
+      : 'The requested collaboration proposal could not be found or you do not have permission to view it.';
     return (
       <div className="min-h-screen bg-background py-16 px-4 flex items-center justify-center">
-        <div className="max-w-md w-full bg-surface border border-border rounded-2xl p-8 shadow-card text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-danger/10 text-danger mx-auto flex items-center justify-center">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <h2 className="text-lg font-bold text-foreground">Inquiry Not Found</h2>
-          <p className="text-xs text-foreground-muted">
-            {(error as any)?.message ||
-              'The requested collaboration proposal could not be found or you do not have permission to view it.'}
-          </p>
-          <div className="pt-2 flex justify-center gap-3">
-            <Link
-              to="/creator/inquiries"
-              className="px-4 py-2 bg-foreground text-surface rounded-xl text-xs font-semibold hover:bg-foreground/90 transition-colors shadow-subtle"
-            >
-              Back to Inquiries
-            </Link>
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-2 bg-surface border border-border hover:bg-surface-muted rounded-xl text-xs font-semibold text-foreground transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Retry
-            </button>
-          </div>
+        <div className="max-w-md w-full">
+          {isNotFound ? (
+            <EmptyState
+              icon={<AlertTriangle className="w-8 h-8" />}
+              title="Inquiry Not Found"
+              description={errorMessage}
+              action={{
+                label: 'Back to Inquiries',
+                href: '/creator/inquiries',
+              }}
+            />
+          ) : (
+            <ErrorState
+              title="Unable to load inquiry."
+              message={errorMessage}
+              onRetry={() => refetch()}
+            />
+          )}
         </div>
       </div>
     );
