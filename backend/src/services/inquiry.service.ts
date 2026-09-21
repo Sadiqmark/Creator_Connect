@@ -96,6 +96,58 @@ export type SafeInquiryDTO = {
 };
 
 /**
+ * Detects whether an error represents a PostgreSQL unique constraint violation
+ * on the active inquiry partial unique index:
+ * "unique_active_business_creator_inquiry" ON "inquiries"("business_id", "creator_id")
+ * WHERE "status" IN ('PENDING', 'ACCEPTED')
+ */
+export function isActiveInquiryUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') {
+    return false;
+  }
+
+  const p2002 = err as {
+    code?: string;
+    meta?: {
+      target?: unknown;
+      modelName?: unknown;
+    };
+  };
+
+  if (p2002.code !== 'P2002') {
+    return false;
+  }
+
+  // Model must be Inquiry if modelName is present
+  if (p2002.meta?.modelName && p2002.meta.modelName !== 'Inquiry') {
+    return false;
+  }
+
+  const target = p2002.meta?.target;
+
+  // Direct constraint name match if exposed by driver/engine
+  if (
+    target === 'unique_active_business_creator_inquiry' ||
+    (Array.isArray(target) && target.length === 1 && target[0] === 'unique_active_business_creator_inquiry')
+  ) {
+    return true;
+  }
+
+  // PostgreSQL runtime Prisma representation: modelName 'Inquiry' and target exactly ['business_id', 'creator_id']
+  if (
+    p2002.meta?.modelName === 'Inquiry' &&
+    Array.isArray(target) &&
+    target.length === 2 &&
+    target.includes('business_id') &&
+    target.includes('creator_id')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Creates a structured collaboration inquiry from authenticated Business to Creator.
  * Enforces business authorization, creator eligibility, duplicate active check,
  * concurrency-safe advisory lock, notification and audit creation.
@@ -230,6 +282,15 @@ export async function createInquiry(
     });
 
     return inquiry;
+  }).catch((err: unknown) => {
+    if (isActiveInquiryUniqueViolation(err)) {
+      throw new AppError(
+        'You already have an active inquiry with this creator.',
+        409,
+        'DUPLICATE_ACTIVE_INQUIRY'
+      );
+    }
+    throw err;
   });
 
   return {

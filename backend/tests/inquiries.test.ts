@@ -6,7 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { app } from '../src/app';
 import { firebaseAdminAuth } from '../src/config/firebase';
 import prisma from '../src/database/prisma';
-import { createInquiry } from '../src/services/inquiry.service';
+import { createInquiry, isActiveInquiryUniqueViolation } from '../src/services/inquiry.service';
 import { UserRole, AccountStatus, InquiryStatus, NotificationType, AuditEventType } from '@prisma/client';
 
 describe('Phase 7B Inquiry Creation Test Suite', () => {
@@ -325,6 +325,126 @@ describe('Phase 7B Inquiry Creation Test Suite', () => {
       expect(res.body.error.code).toBe('DUPLICATE_ACTIVE_INQUIRY');
     });
 
+    it('should return 409 DUPLICATE_ACTIVE_INQUIRY when database throws P2002 on unique_active_business_creator_inquiry (Database Constraint Fallback)', async () => {
+      // Pre-check passes (simulating concurrent race where precheck query returned null before other concurrent commit)
+      const findFirstSpy = jest.fn().mockResolvedValue(null);
+
+      // Database partial unique index triggers P2002 on inquiry.create
+      const p2002Error: any = new Error(
+        'Unique constraint failed on the fields: (`business_id`,`creator_id`)'
+      );
+      p2002Error.code = 'P2002';
+      p2002Error.meta = {
+        modelName: 'Inquiry',
+        target: ['business_id', 'creator_id'],
+      };
+
+      const createInquirySpy = jest.fn().mockRejectedValue(p2002Error);
+
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          inquiry: {
+            findFirst: findFirstSpy,
+            create: createInquirySpy,
+          },
+          notification: { create: jest.fn() },
+          auditEvent: { create: jest.fn() },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer valid-token')
+        .send(validPayload);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('DUPLICATE_ACTIVE_INQUIRY');
+      expect(res.body.error.message).toContain('active inquiry with this creator');
+    });
+
+    it('should return 409 DUPLICATE_ACTIVE_INQUIRY when P2002 metadata contains constraint name', async () => {
+      const p2002Error: any = new Error(
+        'Unique constraint failed on the constraint: unique_active_business_creator_inquiry'
+      );
+      p2002Error.code = 'P2002';
+      p2002Error.meta = {
+        modelName: 'Inquiry',
+        target: ['unique_active_business_creator_inquiry'],
+      };
+
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          inquiry: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockRejectedValue(p2002Error),
+          },
+          notification: { create: jest.fn() },
+          auditEvent: { create: jest.fn() },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer valid-token')
+        .send(validPayload);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('DUPLICATE_ACTIVE_INQUIRY');
+    });
+
+    it('should NOT translate unrelated P2002 errors to DUPLICATE_ACTIVE_INQUIRY and propagate as 500', async () => {
+      const unrelatedP2002: any = new Error('Unique constraint failed on the fields: (`id`)');
+      unrelatedP2002.code = 'P2002';
+      unrelatedP2002.meta = {
+        modelName: 'Inquiry',
+        target: ['id'],
+      };
+
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          inquiry: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockRejectedValue(unrelatedP2002),
+          },
+          notification: { create: jest.fn() },
+          auditEvent: { create: jest.fn() },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer valid-token')
+        .send(validPayload);
+
+      expect(res.status).toBe(500);
+      expect(res.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    });
+
+    it('should NOT translate unexpected non-P2002 database errors to DUPLICATE_ACTIVE_INQUIRY and propagate as 500', async () => {
+      jest.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          inquiry: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockRejectedValue(new Error('PostgreSQL connection terminated unexpectedly')),
+          },
+          notification: { create: jest.fn() },
+          auditEvent: { create: jest.fn() },
+        });
+      });
+
+      const res = await request(app)
+        .post('/api/v1/inquiries')
+        .set('Authorization', 'Bearer valid-token')
+        .send(validPayload);
+
+      expect(res.status).toBe(500);
+      expect(res.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    });
+
     it('should allow creating a new inquiry if prior inquiries were REJECTED, EXPIRED, or CLOSED', async () => {
       const createInquirySpy = jest.fn().mockResolvedValue({
         id: 'inq-new-1',
@@ -637,6 +757,68 @@ describe('Phase 7B Inquiry Creation Test Suite', () => {
       expect(inquiryRows.rows.length).toBe(0);
       expect(notifRows.rows.length).toBe(0);
       expect(auditRows.rows.length).toBe(0);
+    });
+  });
+
+  describe('7. isActiveInquiryUniqueViolation Constraint Helper Verification', () => {
+    it('should return true for exact PostgreSQL active inquiry target [business_id, creator_id] on Inquiry model', () => {
+      expect(
+        isActiveInquiryUniqueViolation({
+          code: 'P2002',
+          meta: { modelName: 'Inquiry', target: ['business_id', 'creator_id'] },
+        })
+      ).toBe(true);
+    });
+
+    it('should return true for exact constraint name target unique_active_business_creator_inquiry', () => {
+      expect(
+        isActiveInquiryUniqueViolation({
+          code: 'P2002',
+          meta: { modelName: 'Inquiry', target: ['unique_active_business_creator_inquiry'] },
+        })
+      ).toBe(true);
+    });
+
+    it('should return false for unrelated Inquiry P2002 on primary key id', () => {
+      expect(
+        isActiveInquiryUniqueViolation({
+          code: 'P2002',
+          meta: { modelName: 'Inquiry', target: ['id'] },
+        })
+      ).toBe(false);
+    });
+
+    it('should return false for unrelated Inquiry index target with additional or different fields', () => {
+      expect(
+        isActiveInquiryUniqueViolation({
+          code: 'P2002',
+          meta: { modelName: 'Inquiry', target: ['business_id', 'status', 'created_at'] },
+        })
+      ).toBe(false);
+    });
+
+    it('should return false for unrelated model P2002', () => {
+      expect(
+        isActiveInquiryUniqueViolation({
+          code: 'P2002',
+          meta: { modelName: 'User', target: ['email'] },
+        })
+      ).toBe(false);
+    });
+
+    it('should return false for non-P2002 error code', () => {
+      expect(
+        isActiveInquiryUniqueViolation({
+          code: 'P2003',
+          meta: { modelName: 'Inquiry', target: ['business_id', 'creator_id'] },
+        })
+      ).toBe(false);
+    });
+
+    it('should return false for non-object, null, or undefined error', () => {
+      expect(isActiveInquiryUniqueViolation(null)).toBe(false);
+      expect(isActiveInquiryUniqueViolation(undefined)).toBe(false);
+      expect(isActiveInquiryUniqueViolation('error')).toBe(false);
     });
   });
 });
