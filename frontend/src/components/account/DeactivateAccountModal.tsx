@@ -24,6 +24,8 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -33,6 +35,9 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
       return;
     }
 
+    // Save previous active element for restoration on close
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null;
+
     const timer = setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
@@ -40,6 +45,30 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isDeactivating) {
         onClose();
+        return;
+      }
+
+      // Focus trap
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
 
@@ -47,6 +76,13 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
     return () => {
       clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        try {
+          previousActiveElementRef.current.focus();
+        } catch {
+          // Opener element may no longer exist in DOM
+        }
+      }
     };
   }, [isOpen, isDeactivating, onClose]);
 
@@ -88,7 +124,11 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
         }
       }}
     >
-      <div className="relative w-full max-w-md bg-surface border border-border rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative w-full max-w-md bg-surface border border-border rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 outline-none"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border p-5 bg-surface-muted/40">
           <div className="flex items-center gap-3">
@@ -109,7 +149,7 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
             onClick={onClose}
             disabled={isDeactivating}
             aria-label="Close dialog"
-            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-danger/50"
           >
             <X className="w-4 h-4" />
           </button>
@@ -166,14 +206,14 @@ export const DeactivateAccountModal: React.FC<DeactivateAccountModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isDeactivating}
-                className="px-4 py-2 bg-surface border border-border hover:bg-surface-muted rounded-xl text-xs font-semibold text-foreground transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-surface border border-border hover:bg-surface-muted rounded-xl text-xs font-semibold text-foreground transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-foreground/20"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!isConfirmed || isDeactivating}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-danger hover:bg-danger/90 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-subtle"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-danger hover:bg-danger/90 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-subtle focus:outline-none focus:ring-2 focus:ring-danger/50"
               >
                 {isDeactivating ? (
                   <>

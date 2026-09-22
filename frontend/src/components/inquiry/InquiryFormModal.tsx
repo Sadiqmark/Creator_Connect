@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -194,6 +194,75 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
     },
   });
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Save previous active element for restoration on close
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null;
+
+    // Initial focus on first interactive element if not already inside modal
+    const focusTimer = setTimeout(() => {
+      if (modalRef.current && !modalRef.current.contains(document.activeElement)) {
+        const firstFocusable = modalRef.current.querySelector<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (firstFocusable) {
+          firstFocusable.focus();
+        } else {
+          modalRef.current.focus();
+        }
+      }
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes when not mutating
+      if (e.key === 'Escape' && !mutation.isPending) {
+        onClose();
+        return;
+      }
+
+      // Focus trap
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(focusTimer);
+      window.removeEventListener('keydown', handleKeyDown);
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        try {
+          previousActiveElementRef.current.focus();
+        } catch {
+          // Opener element may no longer exist in DOM
+        }
+      }
+    };
+  }, [isOpen, mutation.isPending, onClose]);
+
   const onSubmit = (data: InquiryFormData) => {
     setConflictError(null);
     setGeneralError(null);
@@ -208,8 +277,17 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="inquiry-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !mutation.isPending) {
+          onClose();
+        }
+      }}
     >
-      <div className="relative w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200 outline-none"
+      >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-border p-6 bg-surface-muted/40">
           <div className="flex items-center gap-4">
@@ -243,8 +321,9 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={mutation.isPending}
             aria-label="Close dialog"
-            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors"
+            className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <X className="w-5 h-5" />
           </button>
@@ -288,13 +367,17 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
                 type="text"
                 maxLength={100}
                 placeholder="e.g. Sponsored Instagram Reel & Story Series"
+                aria-invalid={errors.collaborationType ? 'true' : undefined}
+                aria-describedby={errors.collaborationType ? 'collaborationType-error' : undefined}
                 {...register('collaborationType')}
                 className={`w-full px-3.5 py-2 bg-background border rounded-xl text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent ${
                   errors.collaborationType ? 'border-destructive' : 'border-border'
                 }`}
               />
               {errors.collaborationType && (
-                <p className="text-xs text-destructive">{errors.collaborationType.message}</p>
+                <p id="collaborationType-error" role="alert" className="text-xs text-destructive">
+                  {errors.collaborationType.message}
+                </p>
               )}
 
               {/* Presets Chips */}
@@ -315,14 +398,18 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
 
             {/* Platform Selection */}
             <div className="space-y-2">
-              <label className="block text-xs font-semibold text-foreground">
+              <label id="platformSelect-label" className="block text-xs font-semibold text-foreground">
                 Platform <span className="text-destructive">*</span>
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div
+                role="radiogroup"
+                aria-labelledby="platformSelect-label"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+              >
                 {PLATFORM_OPTIONS.map((plat) => (
                   <label
                     key={plat}
-                    className={`flex items-center justify-center px-3 py-2 border rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                    className={`flex items-center justify-center px-3 py-2 border rounded-xl text-xs font-medium cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-1 ${
                       selectedPlatform === plat
                         ? 'bg-accent/10 border-accent text-accent font-semibold'
                         : 'bg-background border-border text-foreground hover:bg-surface-muted'
@@ -345,13 +432,15 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
                     type="text"
                     maxLength={50}
                     placeholder="Specify platform (e.g. TikTok, Podcast, Newsletter)"
+                    aria-invalid={errors.customPlatform ? 'true' : undefined}
+                    aria-describedby={errors.customPlatform ? 'customPlatform-error' : undefined}
                     {...register('customPlatform')}
                     className={`w-full px-3.5 py-2 bg-background border rounded-xl text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent ${
                       errors.customPlatform ? 'border-destructive' : 'border-border'
                     }`}
                   />
                   {errors.customPlatform && (
-                    <p className="text-xs text-destructive mt-1">
+                    <p id="customPlatform-error" role="alert" className="text-xs text-destructive mt-1">
                       {errors.customPlatform.message}
                     </p>
                   )}
@@ -374,13 +463,17 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
                 rows={3}
                 maxLength={1000}
                 placeholder="01  1 Dedicated 60s Reel&#10;02  3 Instagram Stories with link sticker"
+                aria-invalid={errors.deliverables ? 'true' : undefined}
+                aria-describedby={errors.deliverables ? 'deliverables-error' : undefined}
                 {...register('deliverables')}
                 className={`w-full px-3.5 py-2 bg-background border rounded-xl text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent resize-none ${
                   errors.deliverables ? 'border-destructive' : 'border-border'
                 }`}
               />
               {errors.deliverables && (
-                <p className="text-xs text-destructive">{errors.deliverables.message}</p>
+                <p id="deliverables-error" role="alert" className="text-xs text-destructive">
+                  {errors.deliverables.message}
+                </p>
               )}
             </div>
 
@@ -399,13 +492,15 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
                     id="timelineStart"
                     type="date"
                     min={todayStr}
+                    aria-invalid={errors.timelineStart ? 'true' : undefined}
+                    aria-describedby={errors.timelineStart ? 'timelineStart-error' : undefined}
                     {...register('timelineStart')}
                     className={`w-full px-3.5 py-1.5 bg-background border rounded-xl text-sm text-foreground focus:outline-none focus:border-accent ${
                       errors.timelineStart ? 'border-destructive' : 'border-border'
                     }`}
                   />
                   {errors.timelineStart && (
-                    <p className="text-xs text-destructive mt-1">
+                    <p id="timelineStart-error" role="alert" className="text-xs text-destructive mt-1">
                       {errors.timelineStart.message}
                     </p>
                   )}
@@ -418,13 +513,15 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
                     id="timelineEnd"
                     type="date"
                     min={todayStr}
+                    aria-invalid={errors.timelineEnd ? 'true' : undefined}
+                    aria-describedby={errors.timelineEnd ? 'timelineEnd-error' : undefined}
                     {...register('timelineEnd')}
                     className={`w-full px-3.5 py-1.5 bg-background border rounded-xl text-sm text-foreground focus:outline-none focus:border-accent ${
                       errors.timelineEnd ? 'border-destructive' : 'border-border'
                     }`}
                   />
                   {errors.timelineEnd && (
-                    <p className="text-xs text-destructive mt-1">
+                    <p id="timelineEnd-error" role="alert" className="text-xs text-destructive mt-1">
                       {errors.timelineEnd.message}
                     </p>
                   )}
@@ -447,13 +544,17 @@ export const InquiryFormModal: React.FC<InquiryFormModalProps> = ({
                 rows={4}
                 maxLength={3000}
                 placeholder="Describe your brand goals, campaign context, product details, creative angle, or visual direction..."
+                aria-invalid={errors.brief ? 'true' : undefined}
+                aria-describedby={errors.brief ? 'brief-error' : undefined}
                 {...register('brief')}
                 className={`w-full px-3.5 py-2 bg-background border rounded-xl text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent resize-none ${
                   errors.brief ? 'border-destructive' : 'border-border'
                 }`}
               />
               {errors.brief && (
-                <p className="text-xs text-destructive">{errors.brief.message}</p>
+                <p id="brief-error" role="alert" className="text-xs text-destructive">
+                  {errors.brief.message}
+                </p>
               )}
             </div>
 
