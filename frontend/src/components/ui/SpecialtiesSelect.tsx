@@ -94,9 +94,10 @@ export const SpecialtiesSelect: React.FC<SpecialtiesSelectProps> = ({
               <button
                 type="button"
                 key={spec}
+                aria-pressed={isSelected}
                 disabled={!isSelected && value.length >= max}
                 onClick={() => toggleSpecialty(spec)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                   isSelected
                     ? 'bg-foreground text-surface border-foreground font-medium'
                     : 'bg-surface text-foreground-muted border-border hover:border-foreground-muted disabled:opacity-40 disabled:cursor-not-allowed'
@@ -119,6 +120,7 @@ export const SpecialtiesSelect: React.FC<SpecialtiesSelectProps> = ({
             onChange={(e) => setCustomInput(e.target.value)}
             onKeyDown={addCustom}
             placeholder="Add custom content specialty..."
+            aria-label="Add custom specialty"
             className="flex-1 px-3 py-2 text-sm bg-surface border border-border rounded-lg text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-accent"
           />
           <button
@@ -131,7 +133,7 @@ export const SpecialtiesSelect: React.FC<SpecialtiesSelectProps> = ({
         </div>
       )}
 
-      {error && <p className="text-xs text-danger font-medium">{error}</p>}
+      {error && <p role="alert" className="text-xs text-danger font-medium">{error}</p>}
     </div>
   );
 };

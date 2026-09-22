@@ -268,7 +268,11 @@ export const HeaderNotificationDropdown: React.FC = () => {
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className="relative flex items-center justify-center w-10 h-10 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
-        aria-label="Notifications"
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : 'Notifications'
+        }
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
@@ -276,7 +280,7 @@ export const HeaderNotificationDropdown: React.FC = () => {
         {unreadCount > 0 && (
           <span
             className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-accent rounded-full border-2 border-surface animate-in zoom-in-50"
-            aria-label={`${unreadCount} unread notifications`}
+            aria-hidden="true"
           >
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>

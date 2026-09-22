@@ -87,7 +87,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-foreground">
+      <label htmlFor="photo-upload-input" className="block text-sm font-medium text-foreground">
         {label} {required && <span className="text-danger">*</span>}
       </label>
 
@@ -115,6 +115,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
               onChange={handleFileChange}
               className="hidden"
               id="photo-upload-input"
+              aria-label={label}
             />
             <button
               type="button"

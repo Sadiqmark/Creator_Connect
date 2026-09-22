@@ -110,7 +110,7 @@ export const LoginPage: React.FC = () => {
                 type="button"
                 onClick={() => setAccountDeactivatedBanner(false)}
                 aria-label="Dismiss banner"
-                className="text-amber-600 dark:text-amber-400 hover:opacity-75 transition-opacity cursor-pointer p-0.5"
+                className="text-amber-600 dark:text-amber-400 hover:opacity-75 transition-opacity cursor-pointer p-1.5 rounded-lg"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -132,7 +132,7 @@ export const LoginPage: React.FC = () => {
                 type="button"
                 onClick={() => setAccountDeletedBanner(false)}
                 aria-label="Dismiss banner"
-                className="text-red-600 dark:text-red-400 hover:opacity-75 transition-opacity cursor-pointer p-0.5"
+                className="text-red-600 dark:text-red-400 hover:opacity-75 transition-opacity cursor-pointer p-1.5 rounded-lg"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -140,7 +140,7 @@ export const LoginPage: React.FC = () => {
           )}
 
           {errorMessage && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-800">
+            <div role="alert" className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3 text-red-800">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm font-medium">{errorMessage}</p>
             </div>

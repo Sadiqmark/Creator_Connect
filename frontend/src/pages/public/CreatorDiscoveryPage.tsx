@@ -311,7 +311,7 @@ export const CreatorDiscoveryPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSearchInput('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-foreground-muted hover:text-foreground rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
                 aria-label="Clear search text"
               >
                 <X className="w-4 h-4" />
@@ -365,13 +365,18 @@ export const CreatorDiscoveryPage: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar">
+            <div
+              role="group"
+              aria-label="Filter creators by niche"
+              className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar"
+            >
               {APPROVED_NICHES.map((niche) => (
                 <button
                   type="button"
                   key={niche}
+                  aria-pressed={selectedNiche === niche}
                   onClick={() => handleNicheChange(niche)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                     selectedNiche === niche
                       ? 'bg-foreground text-surface'
                       : 'bg-surface-muted text-foreground-muted hover:bg-border'
