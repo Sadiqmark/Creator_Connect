@@ -77,18 +77,18 @@ export const CreatorDashboard: React.FC = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-surface border-b border-border sticky top-0 z-30 shadow-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center text-white shadow-subtle">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center text-white shadow-subtle shrink-0">
               <Sparkles className="w-4 h-4" />
             </div>
-            <span className="font-display text-xl font-bold text-foreground">Creator Connect</span>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+            <span className="font-display text-base sm:text-xl font-bold text-foreground truncate">Creator Connect</span>
+            <span className="hidden md:inline-flex text-xs font-semibold px-2.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 shrink-0">
               Creator Workspace
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <Link
               to="/creators"
               className="text-xs font-semibold text-foreground-muted hover:text-foreground hidden sm:inline transition-colors"
@@ -100,26 +100,32 @@ export const CreatorDashboard: React.FC = () => {
 
             <Link
               to="/creator/profile"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+              aria-label="My Profile"
+              title="My Profile"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >
-              <User className="w-3.5 h-3.5" />
-              My Profile
+              <User className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">My Profile</span>
             </Link>
 
             <Link
               to="/settings"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+              aria-label="Settings"
+              title="Settings"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >
-              <Settings className="w-3.5 h-3.5" />
-              Settings
+              <Settings className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Settings</span>
             </Link>
 
             <button
               onClick={() => signOut()}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+              aria-label="Sign Out"
+              title="Sign Out"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign Out
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>

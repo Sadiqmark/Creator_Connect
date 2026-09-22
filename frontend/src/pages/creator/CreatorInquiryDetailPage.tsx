@@ -326,12 +326,12 @@ export const CreatorInquiryDetailPage: React.FC = () => {
                 Review deliverables and terms below before confirming or declining this collaboration.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setModalAction('REJECT')}
                 disabled={isMutating}
-                className="px-4 py-2 border border-border hover:border-danger hover:text-danger rounded-xl text-xs font-semibold text-foreground-muted transition-colors disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto justify-center px-4 py-2 border border-border hover:border-danger hover:text-danger rounded-xl text-xs font-semibold text-foreground-muted transition-colors disabled:opacity-50 cursor-pointer text-center"
               >
                 Decline Proposal
               </button>
@@ -339,7 +339,7 @@ export const CreatorInquiryDetailPage: React.FC = () => {
                 type="button"
                 onClick={() => setModalAction('ACCEPT')}
                 disabled={isMutating}
-                className="px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-xl text-xs font-semibold transition-colors shadow-subtle disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto justify-center px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-xl text-xs font-semibold transition-colors shadow-subtle disabled:opacity-50 cursor-pointer text-center"
               >
                 Accept Collaboration
               </button>

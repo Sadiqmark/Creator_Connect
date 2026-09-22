@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Instagram, Youtube, Globe, Copy, Check, ExternalLink } from 'lucide-react';
 import { InquiryCreatorContactDTO, InquiryBusinessContactDTO } from '../../services/api/inquiries';
+import { useToast } from '../ui/Toast';
 
 interface CreatorContactCardProps {
   contact: InquiryCreatorContactDTO;
@@ -11,6 +12,7 @@ interface BusinessContactCardProps {
 }
 
 export const CreatorContactCard: React.FC<CreatorContactCardProps> = ({ contact }) => {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
 
   const handleCopyEmail = async () => {
@@ -18,6 +20,7 @@ export const CreatorContactCard: React.FC<CreatorContactCardProps> = ({ contact 
     try {
       await navigator.clipboard.writeText(contact.collaborationEmail);
       setCopied(true);
+      toast.success('Email copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback if clipboard API is unavailable
@@ -116,6 +119,7 @@ export const CreatorContactCard: React.FC<CreatorContactCardProps> = ({ contact 
 };
 
 export const BusinessContactCard: React.FC<BusinessContactCardProps> = ({ contact }) => {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
 
   const handleCopyEmail = async () => {
@@ -123,6 +127,7 @@ export const BusinessContactCard: React.FC<BusinessContactCardProps> = ({ contac
     try {
       await navigator.clipboard.writeText(contact.collaborationEmail);
       setCopied(true);
+      toast.success('Email copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback if clipboard API is unavailable

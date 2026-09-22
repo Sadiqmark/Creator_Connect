@@ -68,66 +68,78 @@ export const BusinessDashboard: React.FC = () => {
     <div className="min-h-screen bg-background">
       {/* Top Header */}
       <header className="bg-surface border-b border-border sticky top-0 z-30 shadow-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-foreground flex items-center justify-center text-surface shadow-subtle">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-foreground flex items-center justify-center text-surface shadow-subtle shrink-0">
               <Building2 className="w-4 h-4" />
             </div>
-            <span className="font-display text-xl font-bold text-foreground">Creator Connect</span>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-surface-muted text-foreground border border-border">
+            <span className="font-display text-base sm:text-xl font-bold text-foreground truncate">Creator Connect</span>
+            <span className="hidden md:inline-flex text-xs font-semibold px-2.5 py-0.5 rounded-full bg-surface-muted text-foreground border border-border shrink-0">
               Brand Workspace
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 lg:gap-3 shrink-0">
             <Link
               to="/creators"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent/90 shadow-subtle transition-colors"
+              aria-label="Find Creators"
+              title="Find Creators"
+              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent/90 shadow-subtle transition-colors"
             >
-              <Search className="w-3.5 h-3.5" />
-              Find Creators
+              <Search className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Find Creators</span>
             </Link>
 
             <Link
               to="/business/saved-creators"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+              aria-label="Saved Creators"
+              title="Saved Creators"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >
-              <Bookmark className="w-3.5 h-3.5" />
-              Saved Creators
+              <Bookmark className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline">Saved Creators</span>
             </Link>
 
             <Link
               to="/business/inquiries"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+              aria-label="Inquiries"
+              title="Inquiries"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >
-              <Send className="w-3.5 h-3.5" />
-              Inquiries
+              <Send className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden lg:inline">Inquiries</span>
             </Link>
 
             <HeaderNotificationDropdown />
 
             <Link
               to="/business/profile"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+              aria-label="Brand Profile"
+              title="Brand Profile"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >
-              <Briefcase className="w-3.5 h-3.5" />
-              Brand Profile
+              <Briefcase className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline">Brand Profile</span>
             </Link>
 
             <Link
               to="/settings"
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
+              aria-label="Settings"
+              title="Settings"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground hover:bg-surface-muted transition-colors"
             >
-              <Settings className="w-3.5 h-3.5" />
-              Settings
+              <Settings className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden md:inline">Settings</span>
             </Link>
 
             <button
               onClick={() => signOut()}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+              aria-label="Sign Out"
+              title="Sign Out"
+              className="flex items-center gap-1.5 text-xs font-semibold p-2 sm:px-3 sm:py-1.5 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign Out
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden md:inline">Sign Out</span>
             </button>
           </div>
         </div>

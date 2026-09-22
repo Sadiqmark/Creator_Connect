@@ -104,6 +104,7 @@ export const HeaderNotificationDropdown: React.FC = () => {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const isAuthenticated = status === 'AUTHENTICATED' && !!appUser;
 
@@ -194,7 +195,7 @@ export const HeaderNotificationDropdown: React.FC = () => {
     },
   });
 
-  // Dismiss on outside click and Escape key
+  // Dismiss on outside click and Escape key (with focus return to trigger, no focus trap)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -203,8 +204,16 @@ export const HeaderNotificationDropdown: React.FC = () => {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && isOpen) {
+        event.preventDefault();
         setIsOpen(false);
+        if (
+          dropdownRef.current &&
+          (dropdownRef.current.contains(document.activeElement) ||
+            document.activeElement === triggerRef.current)
+        ) {
+          triggerRef.current?.focus();
+        }
       }
     };
 
@@ -255,9 +264,10 @@ export const HeaderNotificationDropdown: React.FC = () => {
     <div className="relative inline-block text-left" ref={dropdownRef}>
       {/* Bell Trigger Button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative flex items-center justify-center w-9 h-9 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+        className="relative flex items-center justify-center w-10 h-10 rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
         aria-label="Notifications"
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -276,9 +286,9 @@ export const HeaderNotificationDropdown: React.FC = () => {
       {/* Dropdown Popover */}
       {isOpen && (
         <div
-          role="menu"
-          aria-orientation="vertical"
-          className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-surface border border-border shadow-dropdown z-50 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
+          role="region"
+          aria-label="Notifications"
+          className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl bg-surface border border-border shadow-dropdown z-50 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150"
         >
           {/* Header */}
           <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-surface-muted/50">
@@ -297,10 +307,10 @@ export const HeaderNotificationDropdown: React.FC = () => {
               type="button"
               onClick={handleMarkAllRead}
               disabled={unreadCount === 0 || markAllReadMutation.isPending}
-              className="flex items-center gap-1 text-xs font-semibold text-foreground-muted hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 text-xs font-semibold text-foreground-muted hover:text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors py-1.5 px-2.5 rounded-lg hover:bg-surface-muted/60"
             >
               {markAllReadMutation.isPending ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <CheckCheck className="w-3.5 h-3.5" />
               )}
@@ -309,7 +319,7 @@ export const HeaderNotificationDropdown: React.FC = () => {
           </div>
 
           {/* Body */}
-          <div className="max-h-[380px] overflow-y-auto divide-y divide-border/60">
+          <div className="max-h-[380px] overflow-y-auto">
             {isLoading ? (
               <div className="p-4 space-y-3">
                 {[1, 2, 3].map((i) => (
@@ -337,55 +347,58 @@ export const HeaderNotificationDropdown: React.FC = () => {
                 </p>
               </div>
             ) : (
-              notifications.map((notification) => {
-                const isUnread = !notification.readAt;
-                const { title, description, icon: Icon, iconColor, bgColor } = getNotificationContent(
-                  notification.type
-                );
+              <ul role="list" className="divide-y divide-border/60">
+                {notifications.map((notification) => {
+                  const isUnread = !notification.readAt;
+                  const { title, description, icon: Icon, iconColor, bgColor } = getNotificationContent(
+                    notification.type
+                  );
 
-                return (
-                  <button
-                    key={notification.id}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`w-full text-left p-3.5 flex items-start gap-3 hover:bg-surface-muted/60 transition-colors cursor-pointer group ${
-                      isUnread ? 'bg-accent/[0.03]' : ''
-                    }`}
-                  >
-                    {/* Event Icon */}
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${bgColor} ${iconColor}`}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 pr-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p
-                          className={`text-xs font-semibold truncate ${
-                            isUnread ? 'text-foreground font-bold' : 'text-foreground'
-                          }`}
+                  return (
+                    <li key={notification.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`w-full text-left p-3.5 flex items-start gap-3 hover:bg-surface-muted/60 transition-colors cursor-pointer group ${
+                          isUnread ? 'bg-accent/[0.03]' : ''
+                        }`}
+                      >
+                        {/* Event Icon */}
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${bgColor} ${iconColor}`}
                         >
-                          {title}
-                        </p>
-                        <span className="text-[10px] text-foreground-muted shrink-0">
-                          {formatRelativeTime(notification.createdAt)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-foreground-muted truncate mt-0.5">
-                        {description}
-                      </p>
-                    </div>
+                          <Icon className="w-4 h-4" />
+                        </div>
 
-                    {/* Unread indicator dot */}
-                    {isUnread && (
-                      <span className="w-2 h-2 rounded-full bg-accent shrink-0 mt-1.5" />
-                    )}
-                  </button>
-                );
-              })
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 pr-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p
+                              className={`text-xs font-semibold truncate ${
+                                isUnread ? 'text-foreground font-bold' : 'text-foreground'
+                              }`}
+                            >
+                              {isUnread && <span className="sr-only">Unread: </span>}
+                              {title}
+                            </p>
+                            <span className="text-[10px] text-foreground-muted shrink-0">
+                              {formatRelativeTime(notification.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-foreground-muted truncate mt-0.5">
+                            {description}
+                          </p>
+                        </div>
+
+                        {/* Unread indicator dot */}
+                        {isUnread && (
+                          <span className="w-2 h-2 rounded-full bg-accent shrink-0 mt-1.5" aria-hidden="true" />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </div>
