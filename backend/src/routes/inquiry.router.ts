@@ -9,6 +9,7 @@ import {
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/requireRole';
 import { UserRole } from '@prisma/client';
+import { inquiryLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -45,6 +46,7 @@ router.post(
   '/',
   authMiddleware,
   requireRole(UserRole.BUSINESS),
+  inquiryLimiter,
   createInquiryHandler
 );
 

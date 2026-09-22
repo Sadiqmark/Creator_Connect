@@ -7,6 +7,8 @@ import { httpLogger } from './middleware/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { apiRouter } from './routes';
+import { healthRouter } from './routes/health.router';
+import { globalIpLimiter } from './middleware/rateLimiter';
 
 export const createApp = (): Express => {
   const app = express();
@@ -20,7 +22,7 @@ export const createApp = (): Express => {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
-    exposedHeaders: ['X-Request-Id'],
+    exposedHeaders: ['X-Request-Id', 'Retry-After'],
   };
 
   app.use(cors(corsOptions));
@@ -34,8 +36,11 @@ export const createApp = (): Express => {
   app.use(requestIdMiddleware);
   app.use(httpLogger);
 
-  // API v1 Routing
-  app.use('/api/v1', apiRouter);
+  // Health endpoint — outside rate limiting path
+  app.use('/api/v1/health', healthRouter);
+
+  // API v1 Routing protected by Global IP Limiter
+  app.use('/api/v1', globalIpLimiter, apiRouter);
 
   // Unmatched Routes & Error Handling
   app.use(notFoundHandler);

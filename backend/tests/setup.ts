@@ -1,3 +1,5 @@
+import { resetAllRateLimits } from '../src/middleware/rateLimiter';
+
 // Ensure required HMAC secret is present for test environment
 process.env.EMAIL_RESERVATION_HMAC_SECRET =
   process.env.EMAIL_RESERVATION_HMAC_SECRET ||
@@ -10,4 +12,9 @@ jest.mock('jwks-rsa', () => {
       getSigningKey: jest.fn(),
     })),
   };
+});
+
+// Reset all rate limit store counters between test cases for strict test isolation
+beforeEach(() => {
+  resetAllRateLimits();
 });

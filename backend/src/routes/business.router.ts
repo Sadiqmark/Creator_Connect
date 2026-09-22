@@ -8,12 +8,13 @@ import {
   getPublicBusinessProfile,
   getBusinessDashboard,
 } from '../controllers/business.controller';
+import { profileUpdateLimiter } from '../middleware/rateLimiter';
 
 export const businessRouter = Router();
 
 // Private business routes — must precede /:businessId to prevent route parameter collision
 businessRouter.get('/me', authMiddleware, requireRole(UserRole.BUSINESS), getMyProfile);
-businessRouter.patch('/me', authMiddleware, requireRole(UserRole.BUSINESS), upsertMyProfile);
+businessRouter.patch('/me', authMiddleware, requireRole(UserRole.BUSINESS), profileUpdateLimiter, upsertMyProfile);
 businessRouter.get('/me/dashboard', authMiddleware, requireRole(UserRole.BUSINESS), getBusinessDashboard);
 
 // Public/Creator view of business profile

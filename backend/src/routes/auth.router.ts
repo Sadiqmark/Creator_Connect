@@ -7,6 +7,7 @@ import {
   deactivateAccount,
   reactivateAccount,
 } from '../controllers/auth.controller';
+import { lifecycleLimiter } from '../middleware/rateLimiter';
 
 export const authRouter = Router();
 
@@ -14,13 +15,13 @@ export const authRouter = Router();
 authRouter.get('/me', authMiddleware, getMe);
 
 // First-time role provisioning (requires verified email)
-authRouter.post('/provision', authMiddleware, provisionUser);
+authRouter.post('/provision', authMiddleware, lifecycleLimiter, provisionUser);
 
 // Account deactivation (30-day grace period)
-authRouter.post('/deactivate', authMiddleware, deactivateAccount);
+authRouter.post('/deactivate', authMiddleware, lifecycleLimiter, deactivateAccount);
 
 // Account reactivation (within 30-day grace period)
-authRouter.post('/reactivate', authMiddleware, reactivateAccount);
+authRouter.post('/reactivate', authMiddleware, lifecycleLimiter, reactivateAccount);
 
 // Account soft deletion (legacy/admin)
-authRouter.post('/delete-account', authMiddleware, deleteAccount);
+authRouter.post('/delete-account', authMiddleware, lifecycleLimiter, deleteAccount);
