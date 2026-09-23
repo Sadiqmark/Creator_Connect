@@ -181,8 +181,9 @@ test.describe('Phase 7B — Inquiry Creation Browser E2E Suite', () => {
     // 5. Submit form inside dialog
     await dialog.getByRole('button', { name: /Send Inquiry/i }).click();
 
-    // 6. Success confirmation visible
-    await expect(dialog.getByText(/Inquiry Sent Successfully/i)).toBeVisible();
+    // 6. Success confirmation: dialog closes and global toast appears
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByText('Collaboration proposal sent successfully')).toBeVisible();
 
     // 7. Verify intercepted API payload
     expect(capturedPayload.creatorId).toBe(mockCreator.id);
@@ -332,7 +333,8 @@ test.describe('Phase 7B — Inquiry Creation Browser E2E Suite', () => {
     await dialog.getByLabel(/Collaboration Brief/i).fill('Brand awareness campaign for minimalist watches.');
 
     await dialog.getByRole('button', { name: /Send Inquiry/i }).click();
-    await expect(dialog.getByText(/Inquiry Sent Successfully/i)).toBeVisible();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByText('Collaboration proposal sent successfully')).toBeVisible();
 
     // Verify response privacy: No emails, no internal user IDs
     expect(interceptedInquiryResponse.inquiry.collaborationEmail).toBeUndefined();

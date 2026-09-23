@@ -156,9 +156,9 @@ test.describe('Phase 12 — Header Notifications & Inquiry Navigation E2E Suite'
     await page.waitForLoadState('networkidle');
 
     // Initial state: badge displays '1'
-    const bellButton = page.locator('button[aria-label="Notifications"]');
+    const bellButton = page.getByRole('button', { name: /Notifications, 1 unread/i });
     await expect(bellButton).toBeVisible();
-    await expect(page.locator('span[aria-label="1 unread notifications"]')).toBeVisible();
+    await expect(bellButton.locator('span[aria-hidden="true"]')).toHaveText('1');
 
     // 2. Open popover dropdown
     await bellButton.click();
@@ -178,21 +178,22 @@ test.describe('Phase 12 — Header Notifications & Inquiry Navigation E2E Suite'
     expect(patchCallCount).toBe(1);
 
     // 5. Verify detail page has NO standalone notification bell (removed per UX correction)
-    await expect(page.locator('button[aria-label="Notifications"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Notifications/i })).toHaveCount(0);
 
     // 6. Navigate back to Creator Dashboard
     await page.goto('/creator/dashboard');
     await page.waitForLoadState('networkidle');
 
     // 7. On dashboard: bell is visible, and unread badge is now gone (unreadCount: 0)
-    const dashBellButton = page.locator('button[aria-label="Notifications"]');
+    const dashBellButton = page.getByRole('button', { name: /^Notifications$/i });
     await expect(dashBellButton).toBeVisible();
-    await expect(page.locator('span[aria-label*="unread notifications"]')).toHaveCount(0);
+    await expect(dashBellButton.locator('span[aria-hidden="true"]')).toHaveCount(0);
 
     // 8. Refresh persistence: reload dashboard page and confirm unread count remains 0
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('span[aria-label*="unread notifications"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Notifications$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Notifications$/i }).locator('span[aria-hidden="true"]')).toHaveCount(0);
   });
 
   test('2 unread → click one → unread count 1, refresh persistence, and already-read notification remains read', async ({
@@ -302,9 +303,9 @@ test.describe('Phase 12 — Header Notifications & Inquiry Navigation E2E Suite'
     await page.waitForLoadState('networkidle');
 
     // Initial state: badge shows '2'
-    const bellButton = page.locator('button[aria-label="Notifications"]');
+    const bellButton = page.getByRole('button', { name: /Notifications, 2 unread/i });
     await expect(bellButton).toBeVisible();
-    await expect(page.locator('span[aria-label="2 unread notifications"]')).toBeVisible();
+    await expect(bellButton.locator('span[aria-hidden="true"]')).toHaveText('2');
 
     // 2. Open popover dropdown
     await bellButton.click();
@@ -322,25 +323,26 @@ test.describe('Phase 12 — Header Notifications & Inquiry Navigation E2E Suite'
     expect(patchCalls).toContain('n-001');
 
     // 6. Verify detail page has NO standalone notification bell (removed per UX correction)
-    await expect(page.locator('button[aria-label="Notifications"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Notifications/i })).toHaveCount(0);
 
     // 7. Navigate back to Business Dashboard
     await page.goto('/business/dashboard');
     await page.waitForLoadState('networkidle');
 
     // 8. Dashboard notification bell shows badge '1' (unreadCount dropped by 1 to 1)
-    const returnBellButton = page.locator('button[aria-label="Notifications"]');
+    const returnBellButton = page.getByRole('button', { name: /Notifications, 1 unread/i });
     await expect(returnBellButton).toBeVisible();
-    await expect(page.locator('span[aria-label="1 unread notifications"]')).toBeVisible();
+    await expect(returnBellButton.locator('span[aria-hidden="true"]')).toHaveText('1');
 
     // 9. Refresh persistence: reload dashboard page -> unread badge remains '1'
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('span[aria-label="1 unread notifications"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Notifications, 1 unread/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Notifications, 1 unread/i }).locator('span[aria-hidden="true"]')).toHaveText('1');
 
     // 10. Already-read notification remains read:
     // Open dropdown on dashboard and click the already-read notification (n-001)
-    const reloadedBell = page.locator('button[aria-label="Notifications"]');
+    const reloadedBell = page.getByRole('button', { name: /Notifications, 1 unread/i });
     await reloadedBell.click();
     await expect(page.getByText('Notifications')).toBeVisible();
 
@@ -354,6 +356,7 @@ test.describe('Phase 12 — Header Notifications & Inquiry Navigation E2E Suite'
     // 11. Navigate back to dashboard -> unread badge remains '1'
     await page.goto('/business/dashboard');
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('span[aria-label="1 unread notifications"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Notifications, 1 unread/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Notifications, 1 unread/i }).locator('span[aria-hidden="true"]')).toHaveText('1');
   });
 });

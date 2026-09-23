@@ -135,7 +135,7 @@ test.describe('Creator Connect — Live Real Browser E2E Authentication Suite', 
   test('7. 403 Forbidden & 404 Not Found Pages', async ({ page }) => {
     await page.goto('/forbidden');
     await expect(page.getByRole('heading', { name: /Access Denied \(403\)/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Return to Workspace/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Sign In/i })).toBeVisible();
 
     await page.goto('/nonexistent-test-route-random-404');
     await expect(page.getByRole('heading', { name: /Page Not Found \(404\)/i })).toBeVisible();

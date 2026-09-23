@@ -123,6 +123,37 @@ test.describe('Phase 4B — Profile, Discovery & Privacy Browser E2E Suite', () 
   });
 
   test('5. Creator-facing Business Profile: Read-only, strict privacy, no chat, no bypass', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).__MOCK_FIREBASE_USER__ = {
+        uid: 'fb-c-001',
+        email: 'creator-elena@agency.com',
+        emailVerified: true,
+        getIdToken: async () => 'mock-token',
+      };
+    });
+
+    await page.route('**/api/v1/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: {
+            id: 'c-user-001',
+            firebaseUid: 'fb-c-001',
+            email: 'creator-elena@agency.com',
+            role: 'CREATOR',
+            status: 'ACTIVE',
+            createdAt: new Date().toISOString(),
+          },
+          profile: {
+            id: mockCreatorId,
+            name: 'Elena Rostova',
+          },
+          onboardingCompleted: true,
+        }),
+      });
+    });
+
     await page.route(`**/api/v1/businesses/${mockBusinessId}`, async (route) => {
       await route.fulfill({
         status: 200,
@@ -131,8 +162,8 @@ test.describe('Phase 4B — Profile, Discovery & Privacy Browser E2E Suite', () 
       });
     });
 
-    await page.goto(`/businesses/${mockBusinessId}`);
-    await expect(page).toHaveURL(`/businesses/${mockBusinessId}`);
+    await page.goto(`/creator/business-profile/${mockBusinessId}`);
+    await expect(page).toHaveURL(`/creator/business-profile/${mockBusinessId}`);
 
     // Business details
     await expect(page.getByRole('heading', { name: 'Lumina Apparel' })).toBeVisible();
