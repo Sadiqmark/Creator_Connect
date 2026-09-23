@@ -146,3 +146,13 @@ export const profileUpdateLimiter = createRateLimiter({
   message: RATE_LIMITS.PROFILE_UPDATE.MESSAGE,
   keyGenerator: getAuthenticatedUserRateLimitKey,
 });
+
+/**
+ * Upload signature limiter: targeted protection for POST /uploads/signature (20 req / 15 min / user).
+ */
+export const uploadSignatureLimiter = createRateLimiter({
+  windowMs: RATE_LIMITS.UPLOAD_SIGNATURE.WINDOW_MS,
+  max: RATE_LIMITS.UPLOAD_SIGNATURE.MAX,
+  message: RATE_LIMITS.UPLOAD_SIGNATURE.MESSAGE,
+  keyGenerator: getAuthenticatedUserRateLimitKey,
+});

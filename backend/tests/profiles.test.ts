@@ -135,7 +135,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         instagramUrl: 'https://instagram.com/sarahconnor',
         youtubeUrl: null,
         collaborationEmail: 'collab@example.com',
-        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -153,7 +153,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           specialties: ['Fitness', 'Nutrition'],
           instagramUrl: 'https://instagram.com/sarahconnor',
           collaborationEmail: 'collab@example.com',
-          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+          profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         });
 
       expect(res.status).toBe(200);
@@ -209,7 +209,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           specialties: ['Fitness', 'Nutrition'],
           instagramUrl: 'https://instagram.com/sarahconnor',
           collaborationEmail: null,
-          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+          profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         });
 
       expect(res.status).toBe(422);
@@ -236,7 +236,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         instagramUrl: 'https://instagram.com/sarahconnor',
         youtubeUrl: null,
         collaborationEmail: 'collab@example.com',
-        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -255,7 +255,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           instagramUrl: 'https://instagram.com/sarahconnor',
           youtubeUrl: null,
           collaborationEmail: 'collab@example.com',
-          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+          profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         });
 
       expect(res.status).toBe(200);
@@ -284,7 +284,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         instagramUrl: null,
         youtubeUrl: 'https://youtube.com/@sarahconnor',
         collaborationEmail: 'collab@example.com',
-        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -303,7 +303,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
           instagramUrl: null,
           youtubeUrl: 'https://youtube.com/@sarahconnor',
           collaborationEmail: 'collab@example.com',
-          profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+          profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         });
 
       expect(res.status).toBe(200);
@@ -366,7 +366,7 @@ describe('Phase 4B Profile Management & Privacy Test Suite', () => {
         instagramUrl: 'https://instagram.com/sarahconnor',
         youtubeUrl: null,
         collaborationEmail: 'collab@example.com',
-        profilePhotoUrl: 'https://images.unsplash.com/photo-1',
+        profilePhotoUrl: 'https://res.cloudinary.com/xinpxb9h/image/upload/v1/mock-avatar.jpg',
         createdAt: new Date(),
         updatedAt: new Date(),
       };

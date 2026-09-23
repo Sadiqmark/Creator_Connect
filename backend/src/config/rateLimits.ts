@@ -29,4 +29,9 @@ export const RATE_LIMITS = {
     MAX: 30,
     MESSAGE: 'Too many profile updates. Please wait before saving again.',
   },
+  UPLOAD_SIGNATURE: {
+    WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+    MAX: 20,
+    MESSAGE: 'Too many upload signature requests. Please wait before requesting more.',
+  },
 } as const;

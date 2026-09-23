@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '../middleware/logger';
 import * as businessService from '../services/business.service';
+import { isValidCloudinaryProfileImageUrl } from '../utils/cloudinaryUrlValidator';
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
@@ -13,7 +14,17 @@ const updateBusinessProfileSchema = z.object({
   stateOrProvince: z.string().trim().min(1, 'State or Province is required').max(100),
   country: z.string().trim().min(1, 'Country is required').max(100),
   collaborationEmail: z.string().trim().email('A valid email address is required').max(255),
-  logoUrl: z.string().trim().url('Enter a valid logo URL').max(500).nullable().optional(),
+  logoUrl: z
+    .string()
+    .trim()
+    .url('Enter a valid logo URL')
+    .max(500)
+    .refine(
+      (url) => isValidCloudinaryProfileImageUrl(url),
+      'Logo must be a valid HTTPS image URL hosted on Cloudinary'
+    )
+    .nullable()
+    .optional(),
   websiteUrl: z.string().trim().url('Enter a valid website URL').max(500).nullable().optional(),
   instagramUrl: z
     .string()

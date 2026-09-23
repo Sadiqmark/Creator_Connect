@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { X, Loader2, Camera } from 'lucide-react';
 import { AvatarWithFallback } from './AvatarWithFallback';
+import { getUploadSignature } from '../../services/api/uploads';
 
 interface PhotoUploadProps {
   value?: string | null;
   onChange: (url: string | null) => void;
-  storagePath?: string; // Kept for backward compatibility with callers; preset determines asset folder
+  storagePath?: string; // Kept for backward compatibility with callers
   label?: string;
   nameFallback?: string;
   aspectRatio?: 'square' | 'wide';
@@ -31,7 +32,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
     setUploadError(null);
 
-    // Validate type
+    // Validate type (Client-side UX optimization)
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!validTypes.includes(file.type)) {
       setUploadError('Please select a JPG, PNG, WEBP, or GIF image.');
@@ -46,26 +47,40 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
 
     setIsUploading(true);
     try {
-      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'xinpxb9h';
-      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'creator_connect_profile_images';
+      // Step 1: Request signed upload parameters from backend
+      const signatureData = await getUploadSignature();
 
+      // Step 2: Prepare FormData with server-controlled signed parameters
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('upload_preset', uploadPreset);
+      formData.append('api_key', signatureData.apiKey);
+      formData.append('timestamp', String(signatureData.timestamp));
+      formData.append('signature', signatureData.signature);
+      formData.append('folder', signatureData.folder);
+      formData.append('public_id', signatureData.publicId || (signatureData as any).public_id);
 
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        body: formData,
-      });
+      // Step 3: Direct binary upload from browser to Cloudinary
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
 
-      const data = await response.json();
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Malformed response received from Cloudinary.');
+      }
 
       if (!response.ok) {
         throw new Error(data?.error?.message || 'Failed to upload image. Please try again.');
       }
 
-      const secureUrl = data.secure_url;
-      if (!secureUrl) {
+      const secureUrl = data?.secure_url;
+      if (!secureUrl || typeof secureUrl !== 'string') {
         throw new Error('Upload succeeded but no secure URL was returned.');
       }
 

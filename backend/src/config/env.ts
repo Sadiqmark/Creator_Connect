@@ -20,7 +20,10 @@ export const isPlaceholderValue = (val?: string): boolean => {
     lower === 'placeholder@example.com' ||
     lower === 'placeholder-client-email' ||
     lower === 'placeholder-service-account@placeholder-project-id.iam.gserviceaccount.com' ||
-    lower === 'placeholder-key'
+    lower === 'placeholder-key' ||
+    lower === 'placeholder-cloud-name' ||
+    lower === 'placeholder-api-key' ||
+    lower === 'placeholder-api-secret'
   ) {
     return true;
   }
@@ -56,6 +59,9 @@ export const envSchema = z
     EMAIL_RESERVATION_HMAC_SECRET: z
       .string({ required_error: 'EMAIL_RESERVATION_HMAC_SECRET is required' })
       .min(32, 'EMAIL_RESERVATION_HMAC_SECRET must be at least 32 characters'),
+    CLOUDINARY_CLOUD_NAME: z.string().optional().default('placeholder-cloud-name'),
+    CLOUDINARY_API_KEY: z.string().optional().default('placeholder-api-key'),
+    CLOUDINARY_API_SECRET: z.string().optional().default('placeholder-api-secret'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
@@ -83,6 +89,33 @@ export const envSchema = z
           path: ['FIREBASE_PRIVATE_KEY'],
           message:
             'FIREBASE_PRIVATE_KEY must be explicitly configured with a non-placeholder private key in production',
+        });
+      }
+
+      if (isPlaceholderValue(data.CLOUDINARY_CLOUD_NAME)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CLOUDINARY_CLOUD_NAME'],
+          message:
+            'CLOUDINARY_CLOUD_NAME must be explicitly configured with a non-placeholder value in production',
+        });
+      }
+
+      if (isPlaceholderValue(data.CLOUDINARY_API_KEY)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CLOUDINARY_API_KEY'],
+          message:
+            'CLOUDINARY_API_KEY must be explicitly configured with a non-placeholder value in production',
+        });
+      }
+
+      if (isPlaceholderValue(data.CLOUDINARY_API_SECRET)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CLOUDINARY_API_SECRET'],
+          message:
+            'CLOUDINARY_API_SECRET must be explicitly configured with a non-placeholder value in production',
         });
       }
     }

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '../middleware/logger';
 import * as creatorService from '../services/creator.service';
+import { isValidCloudinaryProfileImageUrl } from '../utils/cloudinaryUrlValidator';
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
@@ -35,7 +36,16 @@ const updateCreatorProfileSchema = z.object({
     .email('A valid email address is required')
     .max(255)
     .optional(),
-  profilePhotoUrl: z.string().trim().url('Enter a valid profile photo URL').max(500).optional(),
+  profilePhotoUrl: z
+    .string()
+    .trim()
+    .url('Enter a valid profile photo URL')
+    .max(500)
+    .refine(
+      (url) => isValidCloudinaryProfileImageUrl(url),
+      'Profile photo must be a valid HTTPS image URL hosted on Cloudinary'
+    )
+    .optional(),
 });
 
 // ─── Controller functions ────────────────────────────────────────────────────
