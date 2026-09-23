@@ -54,6 +54,11 @@ export const VerifyEmailPage: React.FC = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -120,7 +125,7 @@ export const VerifyEmailPage: React.FC = () => {
           <div className="text-center pt-4 border-t border-border">
             <button
               type="button"
-              onClick={() => signOut()}
+              onClick={handleSignOut}
               className="text-xs font-semibold text-foreground-secondary hover:text-foreground hover:underline cursor-pointer"
             >
               Log out or use a different account

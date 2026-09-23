@@ -178,4 +178,41 @@ test.describe('Creator Connect — Live Real Browser E2E Authentication Suite', 
     await modalBtn.click();
     await expect(page.getByRole('heading', { name: /Session Expired/i })).not.toBeVisible();
   });
+
+  test('10. Email Verification Screen — "Log out or use a different account" navigates to Login', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (window as any).__MOCK_FIREBASE_USER__ = {
+        uid: 'fb-unverified-001',
+        email: 'newuser@example.com',
+        emailVerified: false,
+        getIdToken: async () => 'mock-token',
+      };
+    });
+
+    await page.goto('/verify-email');
+    await expect(page).toHaveURL('/verify-email');
+
+    // Confirm Verify Email page is visible
+    await expect(page.getByRole('heading', { name: /Verify your email/i })).toBeVisible();
+    await expect(page.getByText('newuser@example.com')).toBeVisible();
+
+    // Locate "Log out or use a different account"
+    const logoutBtn = page.getByRole('button', {
+      name: /log out or use a different account/i,
+    });
+    await expect(logoutBtn).toBeVisible();
+
+    // Click it
+    await logoutBtn.click();
+
+    // Assert navigation to /login
+    await expect(page).toHaveURL(/\/login/);
+
+    // Assert the Login page is visible
+    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+    await expect(page.locator('input#email')).toBeVisible();
+    await expect(page.locator('input#password')).toBeVisible();
+  });
 });
