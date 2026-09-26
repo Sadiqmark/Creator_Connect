@@ -19,6 +19,11 @@ import { CreatorInquiryDetailPage } from './pages/creator/CreatorInquiryDetailPa
 import { BusinessProfilePage } from './pages/business/BusinessProfilePage';
 import { PublicCreatorProfilePage } from './pages/public/PublicCreatorProfilePage';
 import { CreatorDiscoveryPage } from './pages/public/CreatorDiscoveryPage';
+import { PrivacyPolicyPage } from './pages/public/PrivacyPolicyPage';
+import { TermsOfServicePage } from './pages/public/TermsOfServicePage';
+import { ContactPage } from './pages/public/ContactPage';
+import { AboutPage } from './pages/public/AboutPage';
+import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { BusinessProfileViewPage } from './pages/creator/BusinessProfileViewPage';
 import { SavedCreatorsPage } from './pages/business/SavedCreatorsPage';
 import { BusinessInquiriesPage } from './pages/business/BusinessInquiriesPage';
@@ -78,9 +83,14 @@ export const App: React.FC = () => {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Public Discovery Routes */}
+        {/* Public Discovery & Informational Routes */}
         <Route path="/creators" element={<CreatorDiscoveryPage />} />
         <Route path="/creators/:creatorId" element={<PublicCreatorProfilePage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsOfServicePage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
 
         {/* Role Selection & Onboarding */}
         <Route

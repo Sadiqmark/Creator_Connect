@@ -16,6 +16,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { useToast } from '../../components/ui/Toast';
 import { normalizeApiError } from '../../services/api/errors';
 import { HeaderNotificationDropdown } from '../../components/notification/HeaderNotificationDropdown';
+import { Footer } from '../../components/layout/Footer';
 import {
   Search,
   MapPin,
@@ -233,13 +234,13 @@ export const CreatorDiscoveryPage: React.FC = () => {
   const pagination = Array.isArray(discoveryData) ? undefined : discoveryData?.pagination;
 
   return (
-    <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="max-w-6xl mx-auto space-y-8 flex-1 py-10 px-4 sm:px-6 lg:px-8 w-full">
         {/* Top Header Bar */}
         <header className="flex items-center justify-between border-b border-border pb-4">
           <div className="flex items-center gap-2">
             <span className="font-display text-xl font-bold text-foreground tracking-tight">
-              Creator Connect
+              CreatorSpot
             </span>
           </div>
           <nav className="flex items-center gap-3 text-xs font-semibold" aria-label="Main Navigation">
@@ -572,6 +573,7 @@ export const CreatorDiscoveryPage: React.FC = () => {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 };

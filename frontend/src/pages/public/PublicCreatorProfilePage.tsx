@@ -17,6 +17,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { useToast } from '../../components/ui/Toast';
 import { isNotFoundError } from '../../services/api/errors';
 import { InquiryFormModal } from '../../components/inquiry/InquiryFormModal';
+import { Footer } from '../../components/layout/Footer';
 import {
   MapPin,
   Instagram,
@@ -209,8 +210,8 @@ export const PublicCreatorProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="max-w-4xl mx-auto space-y-6 flex-1 py-10 px-4 sm:px-6 lg:px-8 w-full">
         {/* Navigation Breadcrumb */}
         <div className="flex items-center justify-between">
           <Link
@@ -377,6 +378,7 @@ export const PublicCreatorProfilePage: React.FC = () => {
           />
         )}
       </div>
+      <Footer />
     </div>
   );
 };
